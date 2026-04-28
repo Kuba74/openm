@@ -66,6 +66,19 @@ export type NotesUpdatePayload = {
 
 export type NotesDataAdapter<C = unknown> = {
   list: (params: { entityId: string | null; dealId: string | null; context?: C }) => Promise<CommentSummary[]>
+  listPage?: (params: {
+    entityId: string | null
+    dealId: string | null
+    page: number
+    pageSize: number
+    context?: C
+  }) => Promise<{
+    items: CommentSummary[]
+    total: number
+    page: number
+    pageSize: number
+    totalPages: number
+  }>
   create: (params: NotesCreatePayload & { context?: C }) => Promise<Partial<CommentSummary> | void>
   update: (params: { id: string; patch: NotesUpdatePayload; context?: C }) => Promise<void>
   delete: (params: { id: string; context?: C }) => Promise<void>
@@ -448,7 +461,10 @@ function NotesSectionImpl<C = unknown>({
   const [contentError, setContentError] = React.useState<string | null>(null)
   const contentTextareaRef = React.useRef<HTMLTextAreaElement | null>(null)
   const [visibleCount, setVisibleCount] = React.useState(0)
+  const [currentPage, setCurrentPage] = React.useState(1)
+  const [totalPages, setTotalPages] = React.useState(1)
   const [deletingNoteId, setDeletingNoteId] = React.useState<string | null>(null)
+  const pagedMode = typeof dataAdapter.listPage === 'function'
 
   React.useEffect(() => {
     const queryEntityId = typeof entityId === 'string' ? entityId : ''
@@ -457,6 +473,8 @@ function NotesSectionImpl<C = unknown>({
       setNotes([])
       setLoadError(null)
       setIsLoading(false)
+      setCurrentPage(1)
+      setTotalPages(1)
       return
     }
     let cancelled = false
@@ -465,6 +483,20 @@ function NotesSectionImpl<C = unknown>({
     pushLoading()
     async function loadNotes() {
       try {
+        if (dataAdapter.listPage) {
+          const pageResult = await dataAdapter.listPage({
+            entityId: queryEntityId || null,
+            dealId: queryDealId || null,
+            page: 1,
+            pageSize: 20,
+            context: dataContext,
+          })
+          if (cancelled) return
+          setNotes(pageResult.items)
+          setCurrentPage(pageResult.page)
+          setTotalPages(pageResult.totalPages)
+          return
+        }
         const mapped = await dataAdapter.list({
           entityId: queryEntityId || null,
           dealId: queryDealId || null,
@@ -472,12 +504,16 @@ function NotesSectionImpl<C = unknown>({
         })
         if (cancelled) return
         setNotes(mapped)
+        setCurrentPage(1)
+        setTotalPages(1)
       } catch (err) {
         if (cancelled) return
         const message =
           err instanceof Error ? err.message : label('loadError', 'Failed to load notes.')
         setNotes([])
         setLoadError(message)
+        setCurrentPage(1)
+        setTotalPages(1)
         flash(message, 'error')
       } finally {
         if (!cancelled) setIsLoading(false)
@@ -488,7 +524,7 @@ function NotesSectionImpl<C = unknown>({
     return () => {
       cancelled = true
     }
-  }, [dataAdapter, dataContext, dealId, entityId, popLoading, pushLoading, t])
+  }, [dataAdapter, dataContext, dealId, entityId, label, popLoading, pushLoading])
 
   const youLabel = label('you', 'You')
   const viewerLabel = React.useMemo(() => viewerName ?? viewerEmail ?? null, [viewerEmail, viewerName])
@@ -536,6 +572,10 @@ function NotesSectionImpl<C = unknown>({
   }, [readMarkdownPreference])
 
   React.useEffect(() => {
+    if (pagedMode) {
+      setVisibleCount(notes.length)
+      return
+    }
     if (!notes.length) {
       setVisibleCount(0)
       return
@@ -545,7 +585,7 @@ function NotesSectionImpl<C = unknown>({
       if (prev >= notes.length) return prev
       return Math.min(Math.max(prev, baseline), notes.length)
     })
-  }, [notes.length])
+  }, [notes.length, pagedMode])
 
   React.useEffect(() => {
     if (hasEntity) return
@@ -555,8 +595,14 @@ function NotesSectionImpl<C = unknown>({
     setDraftColor(null)
   }, [hasEntity])
 
-  const visibleNotes = React.useMemo(() => notes.slice(0, visibleCount), [notes, visibleCount])
-  const hasVisibleNotes = React.useMemo(() => visibleCount > 0, [visibleCount])
+  const visibleNotes = React.useMemo(
+    () => (pagedMode ? notes : notes.slice(0, visibleCount)),
+    [notes, pagedMode, visibleCount],
+  )
+  const hasVisibleNotes = React.useMemo(
+    () => (pagedMode ? notes.length > 0 : visibleCount > 0),
+    [notes.length, pagedMode, visibleCount],
+  )
 
   const loadMoreLabel = label('loadMore')
 
@@ -620,6 +666,7 @@ function NotesSectionImpl<C = unknown>({
           }
           return [newNote, ...prev]
         })
+        setVisibleCount((prev) => Math.max(prev, 1))
         flash(label('success'), 'success')
         return true
       } catch (err) {
@@ -688,6 +735,9 @@ function NotesSectionImpl<C = unknown>({
       try {
         await dataAdapter.delete({ id: note.id, context: dataContext })
         setNotes((prev) => prev.filter((existing) => existing.id !== note.id))
+        if (pagedMode) {
+          setVisibleCount((prev) => Math.max(0, prev - 1))
+        }
         flash(label('deleteSuccess', 'Note deleted'), 'success')
       } catch (err) {
         const message = err instanceof Error ? err.message : label('deleteError', 'Failed to delete note')
@@ -718,11 +768,40 @@ function NotesSectionImpl<C = unknown>({
   )
 
   const handleLoadMore = React.useCallback(() => {
+    if (pagedMode && dataAdapter.listPage) {
+      if (currentPage >= totalPages || isLoading) return
+      const queryEntityId = typeof entityId === 'string' ? entityId : ''
+      const queryDealId = typeof dealId === 'string' ? dealId : ''
+      setIsLoading(true)
+      pushLoading()
+      void dataAdapter.listPage({
+        entityId: queryEntityId || null,
+        dealId: queryDealId || null,
+        page: currentPage + 1,
+        pageSize: 20,
+        context: dataContext,
+      })
+        .then((pageResult) => {
+          setNotes((prev) => [...prev, ...pageResult.items])
+          setCurrentPage(pageResult.page)
+          setTotalPages(pageResult.totalPages)
+        })
+        .catch((error) => {
+          const message =
+            error instanceof Error ? error.message : label('loadError', 'Failed to load notes.')
+          flash(message, 'error')
+        })
+        .finally(() => {
+          setIsLoading(false)
+          popLoading()
+        })
+      return
+    }
     setVisibleCount((prev) => {
       if (prev >= notes.length) return prev
       return Math.min(prev + 5, notes.length)
     })
-  }, [notes.length])
+  }, [currentPage, dataAdapter, dataContext, dealId, entityId, flash, isLoading, label, notes.length, pagedMode, popLoading, pushLoading, totalPages])
 
   const handleAppearanceDialogSubmit = React.useCallback(async () => {
     if (!appearanceDialogState) return
@@ -1036,6 +1115,20 @@ function NotesSectionImpl<C = unknown>({
       {loadError ? <ErrorMessage label={loadError} className="mt-3" /> : null}
 
       <div className="space-y-3">
+        {!composerOpen && hasVisibleNotes && !onActionChange ? (
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={focusComposer}
+              disabled={isSubmitting || isLoading || !hasEntity}
+            >
+              <Plus className="size-4" />
+              {addActionLabel}
+            </Button>
+          </div>
+        ) : null}
         {isLoading ? (
           <LoadingMessage
             label={label('loading', 'Loading notes…')}
@@ -1208,7 +1301,7 @@ function NotesSectionImpl<C = unknown>({
             }}
           />
         )}
-        {isLoading || visibleCount >= notes.length ? null : (
+        {isLoading || (pagedMode ? currentPage >= totalPages : visibleCount >= notes.length) ? null : (
           <div className="flex justify-center">
             <Button variant="outline" size="sm" onClick={handleLoadMore}>
               {loadMoreLabel}

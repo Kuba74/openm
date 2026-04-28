@@ -119,12 +119,18 @@ test.describe('TC-TRANS-005: Translation Manager Standalone', () => {
       })
       const deTab = managerCard.getByRole('button', { name: 'DE' })
       await deTab.click()
+      await expect(deTab).toHaveAttribute('data-state', 'active')
 
       const titleInput = page.locator('table input').first()
       await titleInput.fill('Deutscher Titel QA')
 
       await page.getByRole('button', { name: 'Save translations' }).click()
-      await expect(page.getByText('Translations saved').first()).toBeVisible()
+      await expect.poll(async () => {
+        const response = await apiRequest(request, 'GET', `/api/translations/${ENTITY_TYPE}/${productId}`, { token: saToken })
+        if (!response.ok()) return null
+        const body = (await response.json()) as { translations: Record<string, Record<string, string>> }
+        return body.translations?.de?.title ?? null
+      }).toBe('Deutscher Titel QA')
 
       const getResponse = await apiRequest(request, 'GET', `/api/translations/${ENTITY_TYPE}/${productId}`, { token: saToken })
       expect(getResponse.ok()).toBeTruthy()
@@ -165,6 +171,7 @@ test.describe('TC-TRANS-005: Translation Manager Standalone', () => {
       })
       const deTab = managerCard.getByRole('button', { name: 'DE' })
       await deTab.click()
+      await expect(deTab).toHaveAttribute('data-state', 'active')
 
       await expect(page.locator('table input').first()).toHaveValue('Persistenter Titel')
     } finally {
