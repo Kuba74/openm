@@ -114,10 +114,10 @@ None — this run honours the brief from `auto-create-pr` and the source spec; n
 
 ### Phase 2: JDG reclassification helper + upgrade action
 
-- [ ] 2.1 `reclassifyJdgEntities` helper at `packages/core/src/modules/customers/lib/jdgClassification.ts`
-- [ ] 2.2 Unit tests in `packages/core/src/modules/customers/lib/__tests__/jdgClassification.test.ts`
-- [ ] 2.3 Upgrade action registration in `packages/core/src/modules/configs/lib/upgrade-actions.ts`
-- [ ] 2.4 i18n keys for the upgrade action in `i18n/{pl,en,de,es}.json`
+- [x] 2.1 `reclassifyJdgEntities` helper at `packages/core/src/modules/customers/lib/jdgClassification.ts` — ccf243772
+- [x] 2.2 Unit tests in `packages/core/src/modules/customers/lib/__tests__/jdgClassification.test.ts` — ccf243772
+- [x] 2.3 Upgrade action registration via `packages/core/src/modules/customers/upgrade-actions.ts` (side-effect import from `customers/index.ts`) — ccf243772
+- [x] 2.4 i18n keys for the upgrade action in `i18n/{pl,en,de,es}.json` — ccf243772
 
 ### Phase 3: Validation gate + PR
 
