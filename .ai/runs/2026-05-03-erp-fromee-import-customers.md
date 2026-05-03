@@ -105,11 +105,11 @@ Best-effort run of typecheck, unit tests for the new module, and `yarn build:pac
 
 ### Phase 1: Module setup + adapter
 
-- [ ] 1.1 NEW `sync_erp_fromee/index.ts` module metadata
-- [ ] 1.2 NEW `lib/erpFromeeAdapter.ts` read-only pg client + child loaders
-- [ ] 1.3 NEW `lib/types.ts` source-row type definitions
-- [ ] 1.4 EDIT `apps/mercato/src/modules.ts` register module
-- [ ] 1.5 EDIT `apps/mercato/.env.example` document `ERP_FROMEE_DATABASE_URL`
+- [x] 1.1 NEW `sync_erp_fromee/index.ts` module metadata — dc84b39fe
+- [x] 1.2 NEW `lib/erpFromeeAdapter.ts` read-only pg client + child loaders — dc84b39fe
+- [x] 1.3 NEW `lib/types.ts` source-row type definitions — dc84b39fe
+- [x] 1.4 EDIT `apps/mercato/src/modules.ts` register module — dc84b39fe
+- [x] 1.5 EDIT `apps/mercato/.env.example` document `ERP_FROMEE_DATABASE_URL` — dc84b39fe
 
 ### Phase 2: Mappers + unit tests
 
