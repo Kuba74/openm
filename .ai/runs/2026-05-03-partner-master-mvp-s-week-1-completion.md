@@ -158,11 +158,11 @@ Best-effort, sandbox-aware. Each step is documented as PASS/BLOCKED:
 
 ### Phase 4: S1.5 primary address uniqueness per purpose
 
-- [ ] 4.1 Add `deleted_at` to `CustomerAddress`
-- [ ] 4.2 Add partial unique index on `customer_addresses`
-- [ ] 4.3 Add `lib/primaryAddress.ts` with `getDefaultOfferAddress`
-- [ ] 4.4 Unit tests in `lib/__tests__/primaryAddress.test.ts`
-- [ ] 4.5 Integration test `__integration__/TC-PARTNER-W1-PrimaryAddress.spec.ts`
+- [x] 4.1 Add `deleted_at` to `CustomerAddress` — 74c98d7d6
+- [x] 4.2 Add partial unique index on `customer_addresses` — 74c98d7d6
+- [x] 4.3 Add `lib/primaryAddress.ts` with `getDefaultOfferAddress` — 74c98d7d6
+- [x] 4.4 Unit tests in `lib/__tests__/primaryAddress.test.ts` — 74c98d7d6
+- [x] 4.5 Integration test `__integration__/TC-PARTNER-W1-PrimaryAddress.spec.ts` — 74c98d7d6
 
 ### Phase 5: i18n + validation gate + PR
 
