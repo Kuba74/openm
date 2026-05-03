@@ -1140,6 +1140,12 @@ export class CustomerCompanyBilling {
   @Property({ name: 'preferred_currency', type: 'text', nullable: true })
   preferredCurrency?: string | null
 
+  @Property({ name: 'sales_owner_user_id', type: 'uuid', nullable: true })
+  salesOwnerUserId?: string | null
+
+  @Property({ name: 'default_offer_validity_days', type: 'int', nullable: true, default: 30 })
+  defaultOfferValidityDays?: number | null
+
   @Property({ name: 'created_at', type: Date, onCreate: () => new Date() })
   createdAt: Date = new Date()
 

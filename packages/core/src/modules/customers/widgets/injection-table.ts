@@ -9,6 +9,13 @@ export const injectionTable: ModuleInjectionTable = {
       groupLabel: 'customers.tax_identities.title',
       priority: 150,
     },
+    {
+      widgetId: 'customers.injection.sales',
+      kind: 'group',
+      column: 2,
+      groupLabel: 'customers.sales.title',
+      priority: 200,
+    },
   ],
 }
 
