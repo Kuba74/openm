@@ -143,11 +143,11 @@ Best-effort, sandbox-aware. Each step is documented as PASS/BLOCKED:
 
 ### Phase 2: S1.3 billing properties + helpers + UI
 
-- [ ] 2.1 Extend `CustomerCompanyBilling` with `salesOwnerUserId` and `defaultOfferValidityDays`
-- [ ] 2.2 Create `data/extensions.ts` with the `defineLink` to `auth:user`
-- [ ] 2.3 Add `lib/companyBilling.ts` with `getSalesOwner` + `getDefaultOfferValidityDays`
-- [ ] 2.4 Unit tests in `lib/__tests__/companyBilling.test.ts`
-- [ ] 2.5 New "Sprzedaż" injection widget for `crud-form:customers:customer_company_profile:fields`
+- [x] 2.1 Extend `CustomerCompanyBilling` with `salesOwnerUserId` and `defaultOfferValidityDays` — 258e4aaec
+- [x] 2.2 Create `data/extensions.ts` with the `defineLink` to `auth:user` — 258e4aaec
+- [x] 2.3 Add `lib/companyBilling.ts` with `getSalesOwner` + `getDefaultOfferValidityDays` — 258e4aaec
+- [x] 2.4 Unit tests in `lib/__tests__/companyBilling.test.ts` — 258e4aaec
+- [x] 2.5 New "Sprzedaż" injection widget for `crud-form:customers:customer_company_profile:fields` (+ GET/PATCH `/api/customers/companies/[id]/sales-billing`) — 258e4aaec
 
 ### Phase 3: S1.4 primary contact uniqueness
 
