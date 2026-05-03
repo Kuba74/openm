@@ -83,6 +83,7 @@ export const setup: ModuleSetupConfig = {
       'customers.activities.manage',
       'customers.pipelines.view',
       'customers.interactions.view',
+      'customers.tax_identities.view',
       'customers.widgets.todos',
       'customers.widgets.next-interactions',
       'customers.widgets.new-customers',

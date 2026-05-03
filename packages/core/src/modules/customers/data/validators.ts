@@ -1,5 +1,18 @@
 import { z } from 'zod'
 import { isValidPhoneNumber } from '@open-mercato/shared/lib/phone'
+import {
+  SUPPORTED_VAT_EU_PREFIXES,
+  isValidEuVat,
+  isValidKrs,
+  isValidNip,
+  isValidPesel,
+  isValidRegon,
+  normalizeKrsForStorage,
+  normalizeNipForStorage,
+  normalizePeselForStorage,
+  normalizeRegonForStorage,
+  normalizeVatEuForStorage,
+} from './taxIdentityChecksums'
 
 const uuid = () => z.string().uuid()
 
@@ -224,6 +237,8 @@ const dictionaryKindEnum = z.enum([
   'pipeline_stage',
   'job_title',
   'industry',
+  'legal_form',
+  'entity_type',
 ])
 
 const dictionaryValueSchema = z.string().trim().min(1).max(150)
@@ -431,3 +446,215 @@ export type PipelineStageCreateInput = z.infer<typeof pipelineStageCreateSchema>
 export type PipelineStageUpdateInput = z.infer<typeof pipelineStageUpdateSchema>
 export type PipelineStageDeleteInput = z.infer<typeof pipelineStageDeleteSchema>
 export type PipelineStageReorderInput = z.infer<typeof pipelineStageReorderSchema>
+
+// --- Tax identity schemas ---
+
+export const TAX_IDENTITY_INVALID_NIP_MESSAGE_KEY = 'customers.tax_identities.errors.invalid_nip'
+export const TAX_IDENTITY_INVALID_REGON_MESSAGE_KEY = 'customers.tax_identities.errors.invalid_regon'
+export const TAX_IDENTITY_INVALID_KRS_MESSAGE_KEY = 'customers.tax_identities.errors.invalid_krs'
+export const TAX_IDENTITY_INVALID_PESEL_MESSAGE_KEY = 'customers.tax_identities.errors.invalid_pesel'
+export const TAX_IDENTITY_INVALID_VAT_EU_MESSAGE_KEY = 'customers.tax_identities.errors.invalid_vat_eu'
+export const TAX_IDENTITY_INVALID_VALUE_MESSAGE_KEY = 'customers.tax_identities.errors.invalid_value'
+export const TAX_IDENTITY_INVALID_COUNTRY_MESSAGE_KEY = 'customers.tax_identities.errors.invalid_country_code'
+
+export const TAX_IDENTITY_KIND_VALUES = [
+  'nip',
+  'regon',
+  'krs',
+  'pesel',
+  'vat_eu',
+  'vat',
+  'eori',
+  'other',
+] as const
+
+export type TaxIdentityKind = typeof TAX_IDENTITY_KIND_VALUES[number]
+
+const taxIdentityKindEnum = z.enum(TAX_IDENTITY_KIND_VALUES)
+
+const countryCodeSchema = z
+  .string()
+  .trim()
+  .regex(/^[A-Za-z]{2}$/, TAX_IDENTITY_INVALID_COUNTRY_MESSAGE_KEY)
+  .transform((value) => value.toUpperCase())
+
+export const nipSchema = z
+  .string()
+  .trim()
+  .min(10)
+  .max(20)
+  .superRefine((value, ctx) => {
+    if (!isValidNip(value)) {
+      ctx.addIssue({ code: 'custom', message: TAX_IDENTITY_INVALID_NIP_MESSAGE_KEY })
+    }
+  })
+  .transform((value) => normalizeNipForStorage(value))
+
+export const regonSchema = z
+  .string()
+  .trim()
+  .min(9)
+  .max(20)
+  .superRefine((value, ctx) => {
+    if (!isValidRegon(value)) {
+      ctx.addIssue({ code: 'custom', message: TAX_IDENTITY_INVALID_REGON_MESSAGE_KEY })
+    }
+  })
+  .transform((value) => normalizeRegonForStorage(value))
+
+export const krsSchema = z
+  .string()
+  .trim()
+  .min(10)
+  .max(20)
+  .superRefine((value, ctx) => {
+    if (!isValidKrs(value)) {
+      ctx.addIssue({ code: 'custom', message: TAX_IDENTITY_INVALID_KRS_MESSAGE_KEY })
+    }
+  })
+  .transform((value) => normalizeKrsForStorage(value))
+
+export const peselSchema = z
+  .string()
+  .trim()
+  .min(11)
+  .max(20)
+  .superRefine((value, ctx) => {
+    if (!isValidPesel(value)) {
+      ctx.addIssue({ code: 'custom', message: TAX_IDENTITY_INVALID_PESEL_MESSAGE_KEY })
+    }
+  })
+  .transform((value) => normalizePeselForStorage(value))
+
+export const vatEuSchema = z
+  .string()
+  .trim()
+  .min(3)
+  .max(20)
+  .superRefine((value, ctx) => {
+    if (!isValidEuVat(value)) {
+      ctx.addIssue({ code: 'custom', message: TAX_IDENTITY_INVALID_VAT_EU_MESSAGE_KEY })
+    }
+  })
+  .transform((value) => normalizeVatEuForStorage(value))
+
+const genericTaxValueSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(80)
+  .transform((value) => value.replace(/\s+/g, '').toUpperCase())
+
+export function validateTaxIdentityValue(
+  kind: TaxIdentityKind,
+  countryCode: string,
+  value: string,
+): { ok: true; value: string } | { ok: false; messageKey: string } {
+  const trimmed = value.trim()
+  if (!trimmed) {
+    return { ok: false, messageKey: TAX_IDENTITY_INVALID_VALUE_MESSAGE_KEY }
+  }
+  switch (kind) {
+    case 'nip':
+      return isValidNip(trimmed)
+        ? { ok: true, value: normalizeNipForStorage(trimmed) }
+        : { ok: false, messageKey: TAX_IDENTITY_INVALID_NIP_MESSAGE_KEY }
+    case 'regon':
+      return isValidRegon(trimmed)
+        ? { ok: true, value: normalizeRegonForStorage(trimmed) }
+        : { ok: false, messageKey: TAX_IDENTITY_INVALID_REGON_MESSAGE_KEY }
+    case 'krs':
+      return isValidKrs(trimmed)
+        ? { ok: true, value: normalizeKrsForStorage(trimmed) }
+        : { ok: false, messageKey: TAX_IDENTITY_INVALID_KRS_MESSAGE_KEY }
+    case 'pesel':
+      return isValidPesel(trimmed)
+        ? { ok: true, value: normalizePeselForStorage(trimmed) }
+        : { ok: false, messageKey: TAX_IDENTITY_INVALID_PESEL_MESSAGE_KEY }
+    case 'vat_eu':
+      return isValidEuVat(trimmed)
+        ? { ok: true, value: normalizeVatEuForStorage(trimmed) }
+        : { ok: false, messageKey: TAX_IDENTITY_INVALID_VAT_EU_MESSAGE_KEY }
+    default: {
+      const normalized = trimmed.replace(/\s+/g, '').toUpperCase()
+      if (!normalized) {
+        return { ok: false, messageKey: TAX_IDENTITY_INVALID_VALUE_MESSAGE_KEY }
+      }
+      return { ok: true, value: normalized }
+    }
+  }
+}
+
+const taxIdentityCommonShape = {
+  countryCode: countryCodeSchema,
+  kind: taxIdentityKindEnum,
+  value: z.string().trim().min(1).max(80),
+  validFrom: z.coerce.date().nullable().optional(),
+  validTo: z.coerce.date().nullable().optional(),
+  isPrimary: z.boolean().optional(),
+}
+
+export const taxIdentityCreateSchema = scopedSchema
+  .extend({
+    entityId: uuid(),
+    ...taxIdentityCommonShape,
+  })
+  .superRefine((payload, ctx) => {
+    const result = validateTaxIdentityValue(payload.kind, payload.countryCode, payload.value)
+    if (!result.ok) {
+      ctx.addIssue({ code: 'custom', message: result.messageKey, path: ['value'] })
+      return
+    }
+    if (payload.kind === 'vat_eu') {
+      const prefix = result.value.substring(0, 2).toUpperCase()
+      if (!SUPPORTED_VAT_EU_PREFIXES.includes(prefix)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: TAX_IDENTITY_INVALID_VAT_EU_MESSAGE_KEY,
+          path: ['value'],
+        })
+      }
+    }
+  })
+  .transform((payload) => {
+    const result = validateTaxIdentityValue(payload.kind, payload.countryCode, payload.value)
+    return result.ok ? { ...payload, value: result.value } : payload
+  })
+
+export const taxIdentityUpdateSchema = scopedSchema
+  .extend({
+    id: uuid(),
+    countryCode: countryCodeSchema.optional(),
+    kind: taxIdentityKindEnum.optional(),
+    value: z.string().trim().min(1).max(80).optional(),
+    validFrom: z.coerce.date().nullable().optional(),
+    validTo: z.coerce.date().nullable().optional(),
+    isPrimary: z.boolean().optional(),
+  })
+  .superRefine((payload, ctx) => {
+    if (payload.kind && payload.value) {
+      const country = payload.countryCode ?? 'PL'
+      const result = validateTaxIdentityValue(payload.kind, country, payload.value)
+      if (!result.ok) {
+        ctx.addIssue({ code: 'custom', message: result.messageKey, path: ['value'] })
+      }
+    }
+  })
+  .transform((payload) => {
+    if (payload.kind && payload.value) {
+      const country = payload.countryCode ?? 'PL'
+      const result = validateTaxIdentityValue(payload.kind, country, payload.value)
+      if (result.ok) {
+        return { ...payload, value: result.value }
+      }
+    }
+    return payload
+  })
+
+export const taxIdentityDeleteSchema = z.object({
+  id: uuid(),
+})
+
+export type TaxIdentityCreateInput = z.infer<typeof taxIdentityCreateSchema>
+export type TaxIdentityUpdateInput = z.infer<typeof taxIdentityUpdateSchema>
+export type TaxIdentityDeleteInput = z.infer<typeof taxIdentityDeleteSchema>
