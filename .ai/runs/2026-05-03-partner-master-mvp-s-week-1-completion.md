@@ -138,8 +138,8 @@ Best-effort, sandbox-aware. Each step is documented as PASS/BLOCKED:
 
 ### Phase 1: S1.1 helpers — `getSalesCustomers`
 
-- [ ] 1.1 `lib/salesCustomers.ts` exports `SalesCustomerScope`, `getSalesCustomers`, `isSalesCustomer`
-- [ ] 1.2 Unit tests in `lib/__tests__/salesCustomers.test.ts`
+- [x] 1.1 `lib/salesCustomers.ts` exports `SalesCustomerScope`, `getSalesCustomers`, `isSalesCustomer` — 982c560f9
+- [x] 1.2 Unit tests in `lib/__tests__/salesCustomers.test.ts` — 982c560f9
 
 ### Phase 2: S1.3 billing properties + helpers + UI
 
