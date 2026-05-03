@@ -242,3 +242,4 @@ None (no `--skill-url` provided).
 ## Changelog
 
 - 2026-05-03 — initial plan committed.
+- 2026-05-03 — Phases 1-8 implementation committed; Phases 3.1 (yarn db:generate) and 7.2 (yarn i18n:check-sync) remain BLOCKED inside the agent sandbox. PR #1 opened against develop with Status: in-progress.
