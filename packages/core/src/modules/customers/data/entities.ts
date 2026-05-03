@@ -700,8 +700,13 @@ export class CustomerComment {
 
 @Entity({ tableName: 'customer_addresses' })
 @Index({ name: 'customer_addresses_entity_idx', properties: ['entity'] })
+@Index({
+  name: 'customer_addresses_primary_per_purpose_idx',
+  expression:
+    `create unique index "customer_addresses_primary_per_purpose_idx" on "customer_addresses" ("entity_id", "purpose") where "is_primary" = true and "deleted_at" is null`,
+})
 export class CustomerAddress {
-  [OptionalProps]?: 'createdAt' | 'updatedAt'
+  [OptionalProps]?: 'createdAt' | 'updatedAt' | 'deletedAt'
 
   @PrimaryKey({ type: 'uuid', defaultRaw: 'gen_random_uuid()' })
   id!: string
@@ -759,6 +764,9 @@ export class CustomerAddress {
 
   @Property({ name: 'updated_at', type: Date, onUpdate: () => new Date() })
   updatedAt: Date = new Date()
+
+  @Property({ name: 'deleted_at', type: Date, nullable: true })
+  deletedAt?: Date | null
 
   @ManyToOne(() => CustomerEntity, { fieldName: 'entity_id' })
   entity!: CustomerEntity
