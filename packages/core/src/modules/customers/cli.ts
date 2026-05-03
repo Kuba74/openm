@@ -85,6 +85,10 @@ const ENTITY_LIFECYCLE_STAGE_DEFAULTS: DictionaryDefault[] = [
   { value: 'customer', label: 'Customer', color: '#22c55e', icon: 'lucide:handshake' },
   { value: 'subscriber', label: 'Subscriber', color: '#10b981', icon: 'lucide:bell' },
   { value: 'churned', label: 'Churned', color: '#ef4444', icon: 'lucide:user-x' },
+  { value: 'supplier', label: 'Supplier', color: '#0ea5e9', icon: 'lucide:truck' },
+  { value: 'partner', label: 'Partner', color: '#a855f7', icon: 'lucide:link' },
+  { value: 'carrier', label: 'Carrier', color: '#f97316', icon: 'lucide:package' },
+  { value: 'internal', label: 'Internal', color: '#64748b', icon: 'lucide:building' },
   { value: 'other', label: 'Other', color: '#94a3b8', icon: 'lucide:circle' },
 ]
 
