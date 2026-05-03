@@ -118,7 +118,196 @@ function createCatalogImageEnricher(targetEntity: string): ResponseEnricher<Line
   }
 }
 
+type QuoteRecord = Record<string, unknown> & { id: string }
+
+async function fetchSalesOwnerDisplayMap(
+  db: Kysely<any>,
+  userIds: Set<string>,
+  organizationId: string,
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>()
+  if (userIds.size === 0) return map
+  const ids = [...userIds]
+
+  const teamRows = (await (db as any)
+    .selectFrom('staff_team_members')
+    .select(['user_id', 'display_name'])
+    .where('user_id', 'in', ids)
+    .where('organization_id', '=', organizationId)
+    .where('deleted_at', 'is', null)
+    .execute()) as Array<{ user_id: string; display_name: string | null }>
+
+  for (const row of teamRows) {
+    const name =
+      typeof row.display_name === 'string' && row.display_name.trim().length > 0
+        ? row.display_name.trim()
+        : null
+    if (name && !map.has(row.user_id)) {
+      map.set(row.user_id, name)
+    }
+  }
+
+  const missing = ids.filter((id) => !map.has(id))
+  if (missing.length === 0) return map
+
+  const userRows = (await (db as any)
+    .selectFrom('users')
+    .select(['id', 'email'])
+    .where('id', 'in', missing)
+    .where('deleted_at', 'is', null)
+    .execute()) as Array<{ id: string; email: string | null }>
+
+  for (const row of userRows) {
+    const email =
+      typeof row.email === 'string' && row.email.trim().length > 0
+        ? row.email.trim()
+        : null
+    if (email) map.set(row.id, email)
+  }
+
+  return map
+}
+
+const salesOwnerDisplayEnricher: ResponseEnricher<QuoteRecord> = {
+  id: 'sales.sales-owner-display:sales_quote',
+  targetEntity: 'sales:sales_quote',
+  features: [],
+  priority: 5,
+  timeout: 1500,
+  critical: false,
+  fallback: {},
+
+  async enrichOne(record, context: EnricherContext) {
+    return (await this.enrichMany!([record], context))[0]
+  },
+
+  async enrichMany(records, context: EnricherContext) {
+    if (records.length === 0) return records
+    const db = getDb(context.em)
+    if (!db) return records
+
+    const userIds = new Set<string>()
+    for (const record of records) {
+      const userId = record['sales_owner_user_id']
+      if (typeof userId === 'string' && userId.length > 0) userIds.add(userId)
+    }
+    if (userIds.size === 0) return records
+
+    const displayMap = await fetchSalesOwnerDisplayMap(db, userIds, context.organizationId)
+
+    return records.map((record) => {
+      const userId = record['sales_owner_user_id']
+      if (typeof userId !== 'string' || userId.length === 0) return record
+      const display = displayMap.get(userId) ?? null
+      const existing = (record['_sales'] as Record<string, unknown> | undefined) ?? {}
+      return {
+        ...record,
+        _sales: { ...existing, salesOwnerDisplay: display },
+      }
+    })
+  },
+}
+
+async function fetchPrimaryContactNameMap(
+  db: Kysely<any>,
+  companyIds: Set<string>,
+  organizationId: string,
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>()
+  if (companyIds.size === 0) return map
+  const ids = [...companyIds]
+
+  const linkRows = (await (db as any)
+    .selectFrom('customer_person_company_links as link')
+    .leftJoin('customer_people as profile', 'profile.entity_id', 'link.person_entity_id')
+    .leftJoin('customer_entities as person_entity', 'person_entity.id', 'link.person_entity_id')
+    .select([
+      'link.company_entity_id as company_id',
+      'profile.preferred_name',
+      'profile.first_name',
+      'profile.last_name',
+      'person_entity.display_name as entity_display_name',
+    ])
+    .where('link.company_entity_id', 'in', ids)
+    .where('link.is_primary', '=', true)
+    .where('link.organization_id', '=', organizationId)
+    .where('link.deleted_at', 'is', null)
+    .execute()) as Array<{
+      company_id: string
+      preferred_name: string | null
+      first_name: string | null
+      last_name: string | null
+      entity_display_name: string | null
+    }>
+
+  for (const row of linkRows) {
+    if (map.has(row.company_id)) continue
+    const first =
+      (typeof row.preferred_name === 'string' && row.preferred_name.trim().length > 0
+        ? row.preferred_name.trim()
+        : null) ??
+      (typeof row.first_name === 'string' && row.first_name.trim().length > 0
+        ? row.first_name.trim()
+        : null)
+    const last =
+      typeof row.last_name === 'string' && row.last_name.trim().length > 0
+        ? row.last_name.trim()
+        : null
+    const composed = [first, last].filter((part): part is string => part !== null).join(' ').trim()
+    const fallback =
+      typeof row.entity_display_name === 'string' && row.entity_display_name.trim().length > 0
+        ? row.entity_display_name.trim()
+        : null
+    const display = composed.length > 0 ? composed : fallback
+    if (display) map.set(row.company_id, display)
+  }
+
+  return map
+}
+
+const primaryContactNameEnricher: ResponseEnricher<QuoteRecord> = {
+  id: 'sales.primary-contact-name:sales_quote',
+  targetEntity: 'sales:sales_quote',
+  features: [],
+  priority: 5,
+  timeout: 1500,
+  critical: false,
+  fallback: {},
+
+  async enrichOne(record, context: EnricherContext) {
+    return (await this.enrichMany!([record], context))[0]
+  },
+
+  async enrichMany(records, context: EnricherContext) {
+    if (records.length === 0) return records
+    const db = getDb(context.em)
+    if (!db) return records
+
+    const companyIds = new Set<string>()
+    for (const record of records) {
+      const companyId = record['customer_entity_id']
+      if (typeof companyId === 'string' && companyId.length > 0) companyIds.add(companyId)
+    }
+    if (companyIds.size === 0) return records
+
+    const nameMap = await fetchPrimaryContactNameMap(db, companyIds, context.organizationId)
+
+    return records.map((record) => {
+      const companyId = record['customer_entity_id']
+      if (typeof companyId !== 'string' || companyId.length === 0) return record
+      const display = nameMap.get(companyId) ?? null
+      const existing = (record['_sales'] as Record<string, unknown> | undefined) ?? {}
+      return {
+        ...record,
+        _sales: { ...existing, primaryContactName: display },
+      }
+    })
+  },
+}
+
 export const enrichers: ResponseEnricher[] = [
   createCatalogImageEnricher('sales:sales_quote_line'),
   createCatalogImageEnricher('sales:sales_order_line'),
+  salesOwnerDisplayEnricher,
+  primaryContactNameEnricher,
 ]

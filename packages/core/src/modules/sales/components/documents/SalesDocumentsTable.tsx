@@ -12,6 +12,7 @@ import { Button } from '@open-mercato/ui/primitives/button'
 import { apiCall } from '@open-mercato/ui/backend/utils/apiCall'
 import { buildCrudExportUrl, deleteCrud } from '@open-mercato/ui/backend/utils/crud'
 import { flash } from '@open-mercato/ui/backend/FlashMessages'
+import { fetchAssignableStaffMembersPage } from '@open-mercato/core/modules/customers/components/detail/assignableStaff'
 import { useOrganizationScopeVersion } from '@open-mercato/shared/lib/frontend/useOrganizationScope'
 import { useT } from '@open-mercato/shared/lib/i18n/context'
 import { useConfirmDialog } from '@open-mercato/ui/backend/confirm-dialog'
@@ -54,8 +55,13 @@ type ApiDocument = {
   placedAt?: string | null
   validUntil?: string | null
   validFrom?: string | null
+  salesOwnerUserId?: string | null
   createdAt?: string | null
   updatedAt?: string | null
+  _sales?: {
+    salesOwnerDisplay?: string | null
+    primaryContactName?: string | null
+  } | null
 }
 
 type DocumentsResponse = {
@@ -76,6 +82,10 @@ type SalesDocumentRow = {
   totalGross?: number | null
   currency?: string | null
   date?: string | null
+  validUntil?: string | null
+  primaryContactName?: string | null
+  salesOwnerUserId?: string | null
+  salesOwnerDisplay?: string | null
 }
 
 const PAGE_SIZE = 20
@@ -157,6 +167,8 @@ export function SalesDocumentsTable({ kind }: { kind: SalesDocumentKind }) {
   const [tagOptions, setTagOptions] = React.useState<FilterOption[]>([])
   const [customerOptions, setCustomerOptions] = React.useState<FilterOption[]>([])
   const [statusMap, setStatusMap] = React.useState<DictionaryMap>({})
+  const [statusOptions, setStatusOptions] = React.useState<FilterOption[]>([])
+  const [salesOwnerOptions, setSalesOwnerOptions] = React.useState<FilterOption[]>([])
 
   const resource = kind === 'order' ? 'orders' : 'quotes'
   const entityId = kind === 'order' ? E.sales.sales_order : E.sales.sales_quote
@@ -253,11 +265,44 @@ export function SalesDocumentsTable({ kind }: { kind: SalesDocumentKind }) {
       )
       const entries = normalizeDictionaryEntries(response.result?.items ?? [])
       setStatusMap(createDictionaryMap(entries))
+      setStatusOptions(
+        entries
+          .map((entry): FilterOption | null => {
+            const value = typeof entry.value === 'string' ? entry.value : null
+            const label = typeof entry.label === 'string' && entry.label.trim().length > 0
+              ? entry.label
+              : value
+            return value && label ? { value, label } : null
+          })
+          .filter((opt): opt is FilterOption => opt !== null),
+      )
     } catch (err) {
       console.error('sales.documents.statuses.load', err)
       setStatusMap({})
+      setStatusOptions([])
     }
   }, [])
+
+  const fetchSalesOwnerOptions = React.useCallback(async (query?: string): Promise<FilterOption[]> => {
+    try {
+      const page = await fetchAssignableStaffMembersPage(query ?? '', { page: 1, pageSize: 50 })
+      return page.items.map<FilterOption>((member) => ({
+        value: member.userId,
+        label: member.displayName,
+      }))
+    } catch {
+      return []
+    }
+  }, [])
+
+  const loadSalesOwnerOptions = React.useCallback(
+    async (query?: string) => {
+      const opts = await fetchSalesOwnerOptions(query)
+      if (opts.length) setSalesOwnerOptions((prev) => mergeOptions(prev, opts))
+      return opts
+    },
+    [fetchSalesOwnerOptions]
+  )
 
   const loadChannelOptions = React.useCallback(
     async (query?: string) => {
@@ -291,9 +336,25 @@ export function SalesDocumentsTable({ kind }: { kind: SalesDocumentKind }) {
     loadTagOptions().catch(() => {})
     loadCustomerOptions().catch(() => {})
     loadStatusMap().catch(() => setStatusMap({}))
-  }, [loadChannelOptions, loadCustomerOptions, loadStatusMap, loadTagOptions, scopeVersion])
+    loadSalesOwnerOptions().catch(() => {})
+  }, [loadChannelOptions, loadCustomerOptions, loadSalesOwnerOptions, loadStatusMap, loadTagOptions, scopeVersion])
 
   const filters = React.useMemo<FilterDef[]>(() => [
+    {
+      id: 'status',
+      label: t('sales.documents.list.filters.status', 'Status'),
+      type: 'tags',
+      options: statusOptions,
+      formatValue: (val: string) => statusOptions.find((opt) => opt.value === val)?.label ?? val,
+    },
+    {
+      id: 'salesOwnerUserId',
+      label: t('sales.documents.list.filters.salesOwner', 'Sales owner'),
+      type: 'tags',
+      options: salesOwnerOptions,
+      loadOptions: loadSalesOwnerOptions,
+      formatValue: (val: string) => salesOwnerOptions.find((opt) => opt.value === val)?.label ?? val,
+    },
     {
       id: 'channelId',
       label: t('sales.documents.list.filters.channel', 'Channel'),
@@ -357,7 +418,7 @@ export function SalesDocumentsTable({ kind }: { kind: SalesDocumentKind }) {
       formatValue: (val: string) => tagOptions.find((o) => o.value === val)?.label ?? val,
       formatDescription: (val: string) => tagOptions.find((o) => o.value === val)?.description ?? null,
     },
-  ], [channelOptions, loadChannelOptions, customerOptions, loadCustomerOptions, loadTagOptions, tagOptions, t])
+  ], [channelOptions, loadChannelOptions, customerOptions, loadCustomerOptions, loadSalesOwnerOptions, loadTagOptions, salesOwnerOptions, statusOptions, tagOptions, t])
 
   const queryParams = React.useMemo(() => {
     const params = new URLSearchParams()
@@ -401,6 +462,18 @@ export function SalesDocumentsTable({ kind }: { kind: SalesDocumentKind }) {
       : []
     if (tagIds.length > 0) {
       params.set('tagIds', tagIds.join(','))
+    }
+    const statusValues = Array.isArray(filterValues.status)
+      ? filterValues.status.map((value) => (typeof value === 'string' ? value.trim() : String(value || '').trim())).filter((v) => v.length > 0)
+      : []
+    if (statusValues.length > 0) {
+      params.set('status', statusValues.join(','))
+    }
+    const salesOwnerValues = Array.isArray(filterValues.salesOwnerUserId)
+      ? filterValues.salesOwnerUserId.map((value) => (typeof value === 'string' ? value.trim() : String(value || '').trim())).filter((v) => v.length > 0)
+      : []
+    if (salesOwnerValues.length > 0) {
+      params.set('salesOwnerUserId', salesOwnerValues.join(','))
     }
     Object.entries(filterValues).forEach(([key, value]) => {
       if (!key.startsWith('cf_') || value == null) return
@@ -452,6 +525,7 @@ export function SalesDocumentsTable({ kind }: { kind: SalesDocumentKind }) {
       const validUntil = doc.validUntil ?? null
       const createdAt = doc.createdAt ?? null
       const date = placedAt ?? validUntil ?? createdAt ?? null
+      const enriched = doc._sales ?? null
       return withDataTableNamespaces({
         id,
         number,
@@ -464,6 +538,10 @@ export function SalesDocumentsTable({ kind }: { kind: SalesDocumentKind }) {
         totalGross,
         currency: doc.currencyCode ?? null,
         date,
+        validUntil,
+        primaryContactName: enriched?.primaryContactName ?? null,
+        salesOwnerUserId: doc.salesOwnerUserId ?? null,
+        salesOwnerDisplay: enriched?.salesOwnerDisplay ?? null,
       }, item)
     },
     [kind]
@@ -603,6 +681,37 @@ export function SalesDocumentsTable({ kind }: { kind: SalesDocumentKind }) {
         </div>
       ),
       enableSorting: false,
+    },
+    {
+      id: 'primaryContactName',
+      accessorKey: 'primaryContactName',
+      header: t('sales.documents.list.table.contact', 'Contact'),
+      cell: ({ row }) => (
+        <span className="text-sm">
+          {row.original.primaryContactName ?? <span className="text-xs text-muted-foreground">—</span>}
+        </span>
+      ),
+      enableSorting: false,
+    },
+    {
+      id: 'salesOwnerDisplay',
+      accessorKey: 'salesOwnerDisplay',
+      header: t('sales.documents.list.table.salesOwner', 'Sales owner'),
+      cell: ({ row }) => (
+        <span className="text-sm">
+          {row.original.salesOwnerDisplay ?? <span className="text-xs text-muted-foreground">—</span>}
+        </span>
+      ),
+      enableSorting: false,
+    },
+    {
+      id: 'validUntil',
+      accessorKey: 'validUntil',
+      header: t('sales.documents.list.table.validUntil', 'Valid until'),
+      cell: ({ row }) =>
+        row.original.validUntil
+          ? <span className="text-xs">{new Date(row.original.validUntil).toLocaleDateString()}</span>
+          : <span className="text-xs text-muted-foreground">—</span>,
     },
     {
       accessorKey: 'channelId',

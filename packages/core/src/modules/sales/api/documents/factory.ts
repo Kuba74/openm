@@ -67,6 +67,8 @@ const listSchema = z
     id: z.string().uuid().optional(),
     customerId: z.string().uuid().optional(),
     channelId: z.string().uuid().optional(),
+    status: z.string().optional(),
+    salesOwnerUserId: z.string().optional(),
     lineItemCountMin: z.coerce.number().min(0).optional(),
     lineItemCountMax: z.coerce.number().min(0).optional(),
     totalNetMin: z.coerce.number().optional(),
@@ -97,6 +99,22 @@ function buildFilters(query: ListQuery, numberColumn: string, kind: DocumentKind
   }
   if (query.channelId) {
     filters.channel_id = { $eq: query.channelId }
+  }
+  const statusValues = typeof query.status === 'string'
+    ? query.status.split(',').map((value) => value.trim()).filter((value) => value.length > 0)
+    : []
+  if (statusValues.length === 1) {
+    filters.status = { $eq: statusValues[0] }
+  } else if (statusValues.length > 1) {
+    filters.status = { $in: statusValues }
+  }
+  const salesOwnerValues = typeof query.salesOwnerUserId === 'string'
+    ? query.salesOwnerUserId.split(',').map((value) => value.trim()).filter((value) => value.length > 0)
+    : []
+  if (salesOwnerValues.length === 1) {
+    filters.sales_owner_user_id = { $eq: salesOwnerValues[0] }
+  } else if (salesOwnerValues.length > 1) {
+    filters.sales_owner_user_id = { $in: salesOwnerValues }
   }
   const lineRange: Record<string, number> = {}
   if (typeof query.lineItemCountMin === 'number') lineRange.$gte = query.lineItemCountMin
@@ -186,6 +204,8 @@ const mapUpdateResponse = (entity: any) => ({
   paymentMethodId: entity?.paymentMethodId ?? null,
   paymentMethodCode: entity?.paymentMethodCode ?? null,
   paymentMethodSnapshot: entity?.paymentMethodSnapshot ?? null,
+  salesOwnerUserId: (entity as any)?.salesOwnerUserId ?? null,
+  paymentTerms: (entity as any)?.paymentTerms ?? null,
 })
 
 const attachTags = async (payload: any, ctx: any) => {
@@ -283,6 +303,8 @@ export function buildDocumentCrudOptions(binding: DocumentBinding) {
     'payment_method_id',
     'payment_method_code',
     'payment_method_snapshot',
+    'sales_owner_user_id',
+    'payment_terms',
     'customer_reference',
     'metadata',
     'external_reference',
@@ -333,6 +355,9 @@ export function buildDocumentCrudOptions(binding: DocumentBinding) {
     indexer: {
       entityType: binding.entityId,
     },
+    enrichers: {
+      entityId: binding.entityId,
+    },
     list: {
       schema: listSchema,
       entityId: binding.entityId,
@@ -373,6 +398,8 @@ export function buildDocumentCrudOptions(binding: DocumentBinding) {
           paymentMethodId: item.payment_method_id ?? null,
           paymentMethodCode: item.payment_method_code ?? null,
           paymentMethodSnapshot: item.payment_method_snapshot ?? null,
+          salesOwnerUserId: item.sales_owner_user_id ?? null,
+          paymentTerms: item.payment_terms ?? null,
           currencyCode: item.currency_code ?? null,
           channelId: item.channel_id ?? null,
           externalReference: item.external_reference ?? null,
@@ -532,6 +559,8 @@ export function buildDocumentOpenApi(binding: DocumentBinding) {
     paymentMethodId: z.string().uuid().nullable().optional(),
     paymentMethodCode: z.string().nullable().optional(),
     paymentMethodSnapshot: z.record(z.string(), z.unknown()).nullable().optional(),
+    salesOwnerUserId: z.string().uuid().nullable().optional(),
+    paymentTerms: z.string().nullable().optional(),
     currencyCode: z.string().nullable(),
     channelId: z.string().uuid().nullable(),
     organizationId: z.string().uuid().nullable(),

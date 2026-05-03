@@ -439,6 +439,12 @@ export class SalesOrder {
   @Property({ name: 'internal_notes', type: 'text', nullable: true })
   internalNotes?: string | null
 
+  @Property({ name: 'sales_owner_user_id', type: 'uuid', nullable: true })
+  salesOwnerUserId?: string | null
+
+  @Property({ name: 'payment_terms', type: 'text', nullable: true })
+  paymentTerms?: string | null
+
   @Property({ name: 'subtotal_net_amount', type: 'numeric', precision: 18, scale: 4, default: '0' })
   subtotalNetAmount: string = '0'
 
@@ -953,6 +959,12 @@ export class SalesQuote {
 
   @Property({ name: 'payment_method_snapshot', type: 'jsonb', nullable: true })
   paymentMethodSnapshot?: Record<string, unknown> | null
+
+  @Property({ name: 'sales_owner_user_id', type: 'uuid', nullable: true })
+  salesOwnerUserId?: string | null
+
+  @Property({ name: 'payment_terms', type: 'text', nullable: true })
+  paymentTerms?: string | null
 
   @Property({ name: 'subtotal_net_amount', type: 'numeric', precision: 18, scale: 4, default: '0' })
   subtotalNetAmount: string = '0'

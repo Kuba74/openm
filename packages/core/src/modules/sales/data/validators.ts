@@ -527,6 +527,8 @@ export const orderCreateSchema = scoped.extend({
   shippingMethodSnapshot: jsonRecord.optional(),
   deliveryWindowSnapshot: jsonRecord.optional(),
   paymentMethodSnapshot: jsonRecord.optional(),
+  salesOwnerUserId: uuid().nullable().optional(),
+  paymentTerms: z.string().trim().max(120).nullable().optional(),
   metadata,
   customFieldSetId: uuid().optional(),
   lines: z.array(orderLineCreateSchema.omit({ organizationId: true, tenantId: true, orderId: true })).optional(),
@@ -566,6 +568,8 @@ export const quoteCreateSchema = scoped.extend({
   shippingMethodSnapshot: jsonRecord.optional(),
   deliveryWindowSnapshot: jsonRecord.optional(),
   paymentMethodSnapshot: jsonRecord.optional(),
+  salesOwnerUserId: uuid().nullable().optional(),
+  paymentTerms: z.string().trim().max(120).nullable().optional(),
   metadata,
   customFieldSetId: uuid().optional(),
   lines: z
