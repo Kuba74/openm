@@ -199,7 +199,8 @@ const createTaxIdentityCommand: CommandHandler<TaxIdentityCreateInput, { taxIden
       organizationId: record.organizationId,
       tenantId: record.tenantId,
     }
-    await em.removeAndFlush(record)
+    em.remove(record)
+    await em.flush()
     const de = ctx.container.resolve('dataEngine') as DataEngine
     await emitCrudUndoSideEffects({
       dataEngine: de,

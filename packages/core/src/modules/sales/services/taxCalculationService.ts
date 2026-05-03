@@ -67,7 +67,19 @@ export class DefaultTaxCalculationService implements TaxCalculationService {
     if (!mode) {
       throw new CrudHttpError(400, { error: 'Unsupported tax calculation mode.' })
     }
-    const { rate, hasValue } = await this.resolveRate(input)
+    const { rate, hasValue, isExempt } = await this.resolveRate(input)
+
+    // Exempt rates (e.g. PL "zw.") yield zero VAT and null taxRate to
+    // distinguish from 0% rate (which is taxable but zero-rated).
+    if (isExempt) {
+      return {
+        netAmount: roundAmount(amount),
+        grossAmount: roundAmount(amount),
+        taxAmount: 0,
+        taxRate: null,
+      }
+    }
+
     const fraction = hasValue ? rate / 100 : 0
 
     let netAmount: number
@@ -89,7 +101,7 @@ export class DefaultTaxCalculationService implements TaxCalculationService {
     }
   }
 
-  private async resolveRate(input: CalculateTaxInput): Promise<{ rate: number; hasValue: boolean }> {
+  private async resolveRate(input: CalculateTaxInput): Promise<{ rate: number; hasValue: boolean; isExempt: boolean }> {
     if (input.taxRateId) {
       const rate = await this.em.findOne(
         SalesTaxRate,
@@ -99,17 +111,17 @@ export class DefaultTaxCalculationService implements TaxCalculationService {
           tenantId: input.tenantId,
           deletedAt: null,
         },
-        { fields: ['rate', 'organizationId', 'tenantId'] }
+        { fields: ['rate', 'isExempt', 'organizationId', 'tenantId'] }
       )
       if (!rate) {
         throw new CrudHttpError(400, { error: 'Tax class not found for this organization.' })
       }
-      return { rate: this.normalizeRate(rate.rate), hasValue: true }
+      return { rate: this.normalizeRate(rate.rate), hasValue: true, isExempt: rate.isExempt === true }
     }
     if (input.taxRate !== undefined && input.taxRate !== null) {
-      return { rate: this.normalizeRate(input.taxRate), hasValue: true }
+      return { rate: this.normalizeRate(input.taxRate), hasValue: true, isExempt: false }
     }
-    return { rate: 0, hasValue: false }
+    return { rate: 0, hasValue: false, isExempt: false }
   }
 
   private normalizeAmount(value: number): number {

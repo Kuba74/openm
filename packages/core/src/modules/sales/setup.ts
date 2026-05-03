@@ -1,7 +1,13 @@
 import type { EntityManager } from '@mikro-orm/postgresql'
 import type { ModuleSetupConfig } from '@open-mercato/shared/modules/setup'
 import { SalesSettings, SalesDocumentSequence, SalesTaxRate } from './data/entities'
-import { DEFAULT_ORDER_NUMBER_FORMAT, DEFAULT_QUOTE_NUMBER_FORMAT } from './lib/documentNumberTokens'
+import {
+  DEFAULT_ORDER_NUMBER_FORMAT,
+  DEFAULT_QUOTE_NUMBER_FORMAT,
+  DEFAULT_INVOICE_NUMBER_FORMAT,
+  DEFAULT_RETURN_NUMBER_FORMAT,
+  DEFAULT_CREDIT_MEMO_NUMBER_FORMAT,
+} from './lib/documentNumberTokens'
 import { seedSalesStatusDictionaries, seedSalesAdjustmentKinds } from './lib/dictionaries'
 import { ensureExampleShippingMethods, ensureExamplePaymentMethods } from './seed/examples-data'
 import { seedSalesExamples } from './seed/examples'
@@ -9,8 +15,11 @@ import { seedSalesExamples } from './seed/examples'
 type SeedScope = { tenantId: string; organizationId: string }
 
 const DEFAULT_TAX_RATES = [
-  { code: 'vat-23', name: '23% VAT', rate: '23' },
-  { code: 'vat-0', name: '0% VAT', rate: '0' },
+  { code: 'vat-23', name: '23% VAT', rate: '23', countryCode: 'PL', isExempt: false, priority: 0 },
+  { code: 'vat-8', name: '8% VAT', rate: '8', countryCode: 'PL', isExempt: false, priority: 10 },
+  { code: 'vat-5', name: '5% VAT', rate: '5', countryCode: 'PL', isExempt: false, priority: 20 },
+  { code: 'vat-0', name: '0% VAT', rate: '0', countryCode: 'PL', isExempt: false, priority: 30 },
+  { code: 'vat-zw', name: 'Zwolnione (zw.)', rate: '0', countryCode: 'PL', isExempt: true, priority: 40 },
 ] as const
 
 async function seedSalesTaxRates(em: EntityManager, scope: SeedScope): Promise<void> {
@@ -34,7 +43,9 @@ async function seedSalesTaxRates(em: EntityManager, scope: SeedScope): Promise<v
           code: seed.code,
           name: seed.name,
           rate: seed.rate,
-          priority: 0,
+          countryCode: seed.countryCode,
+          isExempt: seed.isExempt,
+          priority: seed.priority,
           isCompound: false,
           isDefault: isFirst,
           createdAt: now,
@@ -75,6 +86,10 @@ export const setup: ModuleSetupConfig = {
           organizationId,
           orderNumberFormat: DEFAULT_ORDER_NUMBER_FORMAT,
           quoteNumberFormat: DEFAULT_QUOTE_NUMBER_FORMAT,
+          invoiceNumberFormat: DEFAULT_INVOICE_NUMBER_FORMAT,
+          returnNumberFormat: DEFAULT_RETURN_NUMBER_FORMAT,
+          creditMemoNumberFormat: DEFAULT_CREDIT_MEMO_NUMBER_FORMAT,
+          defaultCurrencyCode: 'PLN',
           createdAt: new Date(),
           updatedAt: new Date(),
         })

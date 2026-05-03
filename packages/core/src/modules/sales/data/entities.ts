@@ -263,6 +263,8 @@ export class SalesPaymentMethod {
 @Index({ name: 'sales_tax_rates_scope_idx', properties: ['organizationId', 'tenantId'] })
 @Unique({ name: 'sales_tax_rates_code_unique', properties: ['organizationId', 'tenantId', 'code'] })
 export class SalesTaxRate {
+  [OptionalProps]?: 'isExempt'
+
   @PrimaryKey({ type: 'uuid', defaultRaw: 'gen_random_uuid()' })
   id!: string
 
@@ -763,7 +765,7 @@ export class SalesOrderAdjustment {
 @Entity({ tableName: 'sales_settings' })
 @Unique({ name: 'sales_settings_scope_unique', properties: ['organizationId', 'tenantId'] })
 export class SalesSettings {
-  [OptionalProps]?: 'createdAt' | 'updatedAt'
+  [OptionalProps]?: 'createdAt' | 'updatedAt' | 'invoiceNumberFormat' | 'returnNumberFormat' | 'creditMemoNumberFormat' | 'defaultCurrencyCode'
 
   @PrimaryKey({ type: 'uuid', defaultRaw: 'gen_random_uuid()' })
   id!: string
