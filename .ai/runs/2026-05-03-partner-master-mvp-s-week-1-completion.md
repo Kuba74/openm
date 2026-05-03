@@ -151,10 +151,10 @@ Best-effort, sandbox-aware. Each step is documented as PASS/BLOCKED:
 
 ### Phase 3: S1.4 primary contact uniqueness
 
-- [ ] 3.1 Add partial unique index on `customer_person_company_links`
-- [ ] 3.2 Add `lib/primaryContact.ts` with `getPrimaryContact`
-- [ ] 3.3 Unit tests in `lib/__tests__/primaryContact.test.ts`
-- [ ] 3.4 Integration test `__integration__/TC-PARTNER-W1-PrimaryContact.spec.ts`
+- [x] 3.1 Add partial unique index on `customer_person_company_links` — 8fa5093b6
+- [x] 3.2 Add `lib/primaryContact.ts` with `getPrimaryContact` — 8fa5093b6
+- [x] 3.3 Unit tests in `lib/__tests__/primaryContact.test.ts` — 8fa5093b6
+- [x] 3.4 Integration test `__integration__/TC-PARTNER-W1-PrimaryContact.spec.ts` — 8fa5093b6
 
 ### Phase 4: S1.5 primary address uniqueness per purpose
 
