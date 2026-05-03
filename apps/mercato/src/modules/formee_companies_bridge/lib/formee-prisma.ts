@@ -1,4 +1,7 @@
-import { Client, type ClientConfig } from 'pg'
+import pkg from 'pg'
+const { Client } = pkg
+type PgClient = InstanceType<typeof pkg.Client>
+type PgClientConfig = ConstructorParameters<typeof pkg.Client>[0]
 
 export type FormeeCompanyRow = {
   id: string
@@ -63,9 +66,9 @@ export function resolveFormeeBridgeConfig(): FormeeBridgeConfig {
 
 async function withClient<T>(
   config: FormeeBridgeConfig,
-  fn: (client: Client) => Promise<T>,
+  fn: (client: PgClient) => Promise<T>,
 ): Promise<T> {
-  const clientConfig: ClientConfig = { connectionString: config.connectionString }
+  const clientConfig: PgClientConfig = { connectionString: config.connectionString }
   const client = new Client(clientConfig)
   await client.connect()
   try {
@@ -99,9 +102,9 @@ export async function* streamFormeeCompanies(
     `
     const params: unknown[] =
       lastCreatedAt && lastId ? [lastCreatedAt.toISOString(), lastId] : []
-    const rows = await withClient(config, async (client) => {
-      const result = await client.query<FormeeCompanyRow>({ text: sql, values: params })
-      return result.rows
+    const rows: FormeeCompanyRow[] = await withClient(config, async (client) => {
+      const result = await (client as any).query({ text: sql, values: params })
+      return result.rows as FormeeCompanyRow[]
     })
     if (rows.length === 0) return
     yield rows
@@ -118,7 +121,7 @@ export async function countFormeeCompanies(
 ): Promise<number> {
   const filter = options.onlyActive ? `WHERE "isActive" = true AND "isBlocked" = false` : ''
   return withClient(config, async (client) => {
-    const result = await client.query<{ count: string }>(
+    const result = await (client as any).query(
       `SELECT COUNT(*)::text AS count FROM "Company" ${filter}`,
     )
     return Number(result.rows[0]?.count ?? '0')

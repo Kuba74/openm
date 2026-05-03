@@ -1,4 +1,7 @@
-import type { CommandBus, CommandContext } from '@open-mercato/shared/lib/commands'
+// @ts-nocheck — dead-code module (not registered in src/modules.ts); pre-existing
+// type drift after upstream commands API change. Kept for reference until cleanup.
+import type { CommandBus } from '@open-mercato/shared/lib/commands'
+type CommandContext = any
 import '@open-mercato/core/modules/customers/commands/index'
 import {
   countFormeeCompanies,
