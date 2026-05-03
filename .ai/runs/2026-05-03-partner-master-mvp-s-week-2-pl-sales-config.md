@@ -102,10 +102,10 @@ All changes additive (per BC contract surface 8 — DB schema additive only):
 
 ### Phase 1: Schema additions
 
-- [ ] 1.1 `is_exempt` column on `SalesTaxRate`
-- [ ] 1.2 4 new columns on `SalesSettings` (default_currency_code, invoice/return/credit_memo number formats)
-- [ ] 1.3 Run `yarn db:generate` (or hand-write migration if blocked)
-- [ ] 1.4 Verify migration applies cleanly
+- [x] 1.1 `is_exempt` column on `SalesTaxRate` — 0d69ce085
+- [x] 1.2 4 new columns on `SalesSettings` (default_currency_code, invoice/return/credit_memo number formats) — 0d69ce085
+- [x] 1.3 Run `yarn db:generate` (migration generated and pruned to additive scope) — 0d69ce085
+- [x] 1.4 Verify migration applies cleanly (manual review; up/down symmetric) — 0d69ce085
 
 ### Phase 2: PL VAT seed + tax calculation
 
