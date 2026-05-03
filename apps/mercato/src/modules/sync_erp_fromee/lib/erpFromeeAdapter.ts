@@ -1,4 +1,7 @@
-import { Client, type ClientConfig } from 'pg'
+import pkg from 'pg'
+const { Client } = pkg
+type PgClient = InstanceType<typeof pkg.Client>
+type PgClientConfig = ConstructorParameters<typeof pkg.Client>[0]
 import type {
   ErpFromeeBundle,
   ErpFromeeCompany,
@@ -130,9 +133,9 @@ export function resolveErpFromeeAdapterConfig(): ErpFromeeAdapterConfig {
 
 async function withClient<T>(
   config: ErpFromeeAdapterConfig,
-  fn: (client: Client) => Promise<T>,
+  fn: (client: PgClient) => Promise<T>,
 ): Promise<T> {
-  const clientConfig: ClientConfig = { connectionString: config.connectionString }
+  const clientConfig: PgClientConfig = { connectionString: config.connectionString }
   const client = new Client(clientConfig)
   await client.connect()
   try {
@@ -154,7 +157,7 @@ export function createErpFromeeAdapter(
       if (roleTypes.length === 0) return 0
       return withClient(config, async (client) => {
         const placeholders = buildPlaceholderList(roleTypes, 1)
-        const result = await client.query<{ count: string }>({
+        const result = await (client as any).query({
           text: `
             SELECT COUNT(DISTINCT c.id)::text AS count
             FROM "Company" c
@@ -196,46 +199,46 @@ export function createErpFromeeAdapter(
             ORDER BY c."createdAt" ASC, c.id ASC
             LIMIT ${effectiveBatch}
           `
-          const companyResult = await client.query<ErpFromeeCompany>({
+          const companyResult = await (client as any).query({
             text: sql,
             values: baseValues,
           })
           const companies = companyResult.rows
           if (companies.length === 0) return []
 
-          const ids = companies.map((c) => c.id)
-          const idPlaceholders = ids.map((_, i) => `$${i + 1}`).join(', ')
+          const ids = companies.map((c: { id: string }) => c.id)
+          const idPlaceholders = ids.map((_: string, i: number) => `$${i + 1}`).join(', ')
 
           const [roles, contacts, addresses, bankAccounts, sourceLinks] = await Promise.all([
-            client.query<ErpFromeeCompanyRole>({
+            (client as any).query({
               text: `SELECT ${ROLE_COLS} FROM "CompanyRole" WHERE "companyId" IN (${idPlaceholders})`,
               values: ids,
             }),
-            client.query<ErpFromeeCompanyContact>({
+            (client as any).query({
               text: `SELECT ${CONTACT_COLS} FROM "CompanyContact" WHERE "companyId" IN (${idPlaceholders})`,
               values: ids,
             }),
-            client.query<ErpFromeeCompanyAddress>({
+            (client as any).query({
               text: `SELECT ${ADDRESS_COLS} FROM "CompanyAddress" WHERE "companyId" IN (${idPlaceholders})`,
               values: ids,
             }),
-            client.query<ErpFromeeCompanyBankAccount>({
+            (client as any).query({
               text: `SELECT ${BANK_COLS} FROM "CompanyBankAccount" WHERE "companyId" IN (${idPlaceholders})`,
               values: ids,
             }),
-            client.query<ErpFromeeCompanySourceLink>({
+            (client as any).query({
               text: `SELECT ${SOURCE_LINK_COLS} FROM "CompanySourceLink" WHERE "companyId" IN (${idPlaceholders})`,
               values: ids,
             }),
           ])
 
-          const rolesByCompany = groupBy(roles.rows, (r) => r.companyId)
-          const contactsByCompany = groupBy(contacts.rows, (r) => r.companyId)
-          const addressesByCompany = groupBy(addresses.rows, (r) => r.companyId)
-          const banksByCompany = groupBy(bankAccounts.rows, (r) => r.companyId)
-          const linksByCompany = groupBy(sourceLinks.rows, (r) => r.companyId)
+          const rolesByCompany = groupBy(roles.rows as ErpFromeeCompanyRole[], (r) => r.companyId)
+          const contactsByCompany = groupBy(contacts.rows as ErpFromeeCompanyContact[], (r) => r.companyId)
+          const addressesByCompany = groupBy(addresses.rows as ErpFromeeCompanyAddress[], (r) => r.companyId)
+          const banksByCompany = groupBy(bankAccounts.rows as ErpFromeeCompanyBankAccount[], (r) => r.companyId)
+          const linksByCompany = groupBy(sourceLinks.rows as ErpFromeeCompanySourceLink[], (r) => r.companyId)
 
-          return companies.map((company) => ({
+          return (companies as ErpFromeeCompany[]).map((company) => ({
             company,
             roles: rolesByCompany.get(company.id) ?? [],
             contacts: contactsByCompany.get(company.id) ?? [],
