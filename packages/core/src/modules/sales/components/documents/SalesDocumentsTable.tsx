@@ -54,8 +54,13 @@ type ApiDocument = {
   placedAt?: string | null
   validUntil?: string | null
   validFrom?: string | null
+  salesOwnerUserId?: string | null
   createdAt?: string | null
   updatedAt?: string | null
+  _sales?: {
+    salesOwnerDisplay?: string | null
+    primaryContactName?: string | null
+  } | null
 }
 
 type DocumentsResponse = {
@@ -76,6 +81,10 @@ type SalesDocumentRow = {
   totalGross?: number | null
   currency?: string | null
   date?: string | null
+  validUntil?: string | null
+  primaryContactName?: string | null
+  salesOwnerUserId?: string | null
+  salesOwnerDisplay?: string | null
 }
 
 const PAGE_SIZE = 20
@@ -452,6 +461,7 @@ export function SalesDocumentsTable({ kind }: { kind: SalesDocumentKind }) {
       const validUntil = doc.validUntil ?? null
       const createdAt = doc.createdAt ?? null
       const date = placedAt ?? validUntil ?? createdAt ?? null
+      const enriched = doc._sales ?? null
       return withDataTableNamespaces({
         id,
         number,
@@ -464,6 +474,10 @@ export function SalesDocumentsTable({ kind }: { kind: SalesDocumentKind }) {
         totalGross,
         currency: doc.currencyCode ?? null,
         date,
+        validUntil,
+        primaryContactName: enriched?.primaryContactName ?? null,
+        salesOwnerUserId: doc.salesOwnerUserId ?? null,
+        salesOwnerDisplay: enriched?.salesOwnerDisplay ?? null,
       }, item)
     },
     [kind]
@@ -603,6 +617,37 @@ export function SalesDocumentsTable({ kind }: { kind: SalesDocumentKind }) {
         </div>
       ),
       enableSorting: false,
+    },
+    {
+      id: 'primaryContactName',
+      accessorKey: 'primaryContactName',
+      header: t('sales.documents.list.table.contact', 'Contact'),
+      cell: ({ row }) => (
+        <span className="text-sm">
+          {row.original.primaryContactName ?? <span className="text-xs text-muted-foreground">—</span>}
+        </span>
+      ),
+      enableSorting: false,
+    },
+    {
+      id: 'salesOwnerDisplay',
+      accessorKey: 'salesOwnerDisplay',
+      header: t('sales.documents.list.table.salesOwner', 'Sales owner'),
+      cell: ({ row }) => (
+        <span className="text-sm">
+          {row.original.salesOwnerDisplay ?? <span className="text-xs text-muted-foreground">—</span>}
+        </span>
+      ),
+      enableSorting: false,
+    },
+    {
+      id: 'validUntil',
+      accessorKey: 'validUntil',
+      header: t('sales.documents.list.table.validUntil', 'Valid until'),
+      cell: ({ row }) =>
+        row.original.validUntil
+          ? <span className="text-xs">{new Date(row.original.validUntil).toLocaleDateString()}</span>
+          : <span className="text-xs text-muted-foreground">—</span>,
     },
     {
       accessorKey: 'channelId',

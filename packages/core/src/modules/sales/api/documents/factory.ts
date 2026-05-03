@@ -186,6 +186,8 @@ const mapUpdateResponse = (entity: any) => ({
   paymentMethodId: entity?.paymentMethodId ?? null,
   paymentMethodCode: entity?.paymentMethodCode ?? null,
   paymentMethodSnapshot: entity?.paymentMethodSnapshot ?? null,
+  salesOwnerUserId: (entity as any)?.salesOwnerUserId ?? null,
+  paymentTerms: (entity as any)?.paymentTerms ?? null,
 })
 
 const attachTags = async (payload: any, ctx: any) => {
@@ -283,6 +285,8 @@ export function buildDocumentCrudOptions(binding: DocumentBinding) {
     'payment_method_id',
     'payment_method_code',
     'payment_method_snapshot',
+    'sales_owner_user_id',
+    'payment_terms',
     'customer_reference',
     'metadata',
     'external_reference',
@@ -333,6 +337,9 @@ export function buildDocumentCrudOptions(binding: DocumentBinding) {
     indexer: {
       entityType: binding.entityId,
     },
+    enrichers: {
+      entityId: binding.entityId,
+    },
     list: {
       schema: listSchema,
       entityId: binding.entityId,
@@ -373,6 +380,8 @@ export function buildDocumentCrudOptions(binding: DocumentBinding) {
           paymentMethodId: item.payment_method_id ?? null,
           paymentMethodCode: item.payment_method_code ?? null,
           paymentMethodSnapshot: item.payment_method_snapshot ?? null,
+          salesOwnerUserId: item.sales_owner_user_id ?? null,
+          paymentTerms: item.payment_terms ?? null,
           currencyCode: item.currency_code ?? null,
           channelId: item.channel_id ?? null,
           externalReference: item.external_reference ?? null,
@@ -532,6 +541,8 @@ export function buildDocumentOpenApi(binding: DocumentBinding) {
     paymentMethodId: z.string().uuid().nullable().optional(),
     paymentMethodCode: z.string().nullable().optional(),
     paymentMethodSnapshot: z.record(z.string(), z.unknown()).nullable().optional(),
+    salesOwnerUserId: z.string().uuid().nullable().optional(),
+    paymentTerms: z.string().nullable().optional(),
     currencyCode: z.string().nullable(),
     channelId: z.string().uuid().nullable(),
     organizationId: z.string().uuid().nullable(),
