@@ -215,6 +215,11 @@ export class CustomerPersonProfile {
   expression:
     `create unique index "customer_person_company_links_active_unique" on "customer_person_company_links" ("person_entity_id", "company_entity_id") where "deleted_at" is null`,
 })
+@Index({
+  name: 'customer_person_company_links_primary_per_company_idx',
+  expression:
+    `create unique index "customer_person_company_links_primary_per_company_idx" on "customer_person_company_links" ("company_entity_id") where "is_primary" = true and "deleted_at" is null`,
+})
 export class CustomerPersonCompanyLink {
   [OptionalProps]?: 'isPrimary' | 'createdAt' | 'updatedAt' | 'deletedAt'
 
@@ -695,8 +700,13 @@ export class CustomerComment {
 
 @Entity({ tableName: 'customer_addresses' })
 @Index({ name: 'customer_addresses_entity_idx', properties: ['entity'] })
+@Index({
+  name: 'customer_addresses_primary_per_purpose_idx',
+  expression:
+    `create unique index "customer_addresses_primary_per_purpose_idx" on "customer_addresses" ("entity_id", "purpose") where "is_primary" = true and "deleted_at" is null`,
+})
 export class CustomerAddress {
-  [OptionalProps]?: 'createdAt' | 'updatedAt'
+  [OptionalProps]?: 'createdAt' | 'updatedAt' | 'deletedAt'
 
   @PrimaryKey({ type: 'uuid', defaultRaw: 'gen_random_uuid()' })
   id!: string
@@ -754,6 +764,9 @@ export class CustomerAddress {
 
   @Property({ name: 'updated_at', type: Date, onUpdate: () => new Date() })
   updatedAt: Date = new Date()
+
+  @Property({ name: 'deleted_at', type: Date, nullable: true })
+  deletedAt?: Date | null
 
   @ManyToOne(() => CustomerEntity, { fieldName: 'entity_id' })
   entity!: CustomerEntity
@@ -1139,6 +1152,12 @@ export class CustomerCompanyBilling {
 
   @Property({ name: 'preferred_currency', type: 'text', nullable: true })
   preferredCurrency?: string | null
+
+  @Property({ name: 'sales_owner_user_id', type: 'uuid', nullable: true })
+  salesOwnerUserId?: string | null
+
+  @Property({ name: 'default_offer_validity_days', type: 'int', nullable: true, default: 30 })
+  defaultOfferValidityDays?: number | null
 
   @Property({ name: 'created_at', type: Date, onCreate: () => new Date() })
   createdAt: Date = new Date()
