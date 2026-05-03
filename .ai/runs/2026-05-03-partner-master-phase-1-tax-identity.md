@@ -186,8 +186,8 @@ None (no `--skill-url` provided).
 
 ### Phase 1: Entities
 
-- [ ] 1.1 Add `CustomerTaxIdentity` entity with required indexes
-- [ ] 1.2 Extend `CustomerCompanyProfile` with legal_form / entity_type / full_address_krs
+- [x] 1.1 Add `CustomerTaxIdentity` entity with required indexes — 86721cb7d
+- [x] 1.2 Extend `CustomerCompanyProfile` with legal_form / entity_type / full_address_krs — 86721cb7d
 
 ### Phase 2: Validators + checksum unit tests
 
