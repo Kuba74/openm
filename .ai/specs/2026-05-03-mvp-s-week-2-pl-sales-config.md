@@ -5,8 +5,8 @@
 **Target window:** 06.05 – 12.05.2026 (Week 2 of May MVP-S)
 **Author:** Kuba74
 **Parent spec:** [2026-05-03-partner-master-migration.md](2026-05-03-partner-master-migration.md)
-**Companion audit:** [ANALYSIS-2026-05-03-mvp-s-week-2-readiness.md](analysis/ANALYSIS-2026-05-03-mvp-s-week-2-readiness.md)
-**Estimated:** ~8 h (down from 40 h originally)
+**Companion audits:** [ANALYSIS-2026-05-03-mvp-s-week-2-readiness.md](analysis/ANALYSIS-2026-05-03-mvp-s-week-2-readiness.md), [ANALYSIS-2026-05-03-catalog-pl-readiness.md](analysis/ANALYSIS-2026-05-03-catalog-pl-readiness.md)
+**Estimated:** ~11 h (8 h core PL VAT/numbering/currency + 3 h catalog units PL)
 
 ## TLDR
 
@@ -198,6 +198,61 @@ final_currency = payload.currency_code
 
 **Estimate:** 3 h
 
+### S2.4 — Polskie jednostki + i18n shorts (3 h)
+
+Per [catalog audit](analysis/ANALYSIS-2026-05-03-catalog-pl-readiness.md) — dodać brakujące PL units i i18n shorts.
+
+**Brakuje w `catalog/lib/seeds.ts`:**
+
+```typescript
+// Dodać do UNIT_DEFAULTS:
+{ value: 'mb', label: 'Running Meter (length)' },  // metr bieżący — typowo PL w budownictwie
+{ value: 't', label: 'Ton (weight)' },             // tona
+```
+
+**i18n shorts** w `catalog/i18n/{pl,en,de,es}.json` pod `catalog.unit.{value}.short`:
+
+```json
+// pl.json
+"catalog.unit.pc.short": "szt.",
+"catalog.unit.set.short": "kpl.",
+"catalog.unit.kg.short": "kg",
+"catalog.unit.t.short": "t",
+"catalog.unit.m.short": "m",
+"catalog.unit.mb.short": "mb",
+"catalog.unit.m2.short": "m²",
+"catalog.unit.m3.short": "m³",
+"catalog.unit.hour.short": "h"
+```
+
+**Helper** `catalog/lib/unitDisplay.ts`:
+
+```typescript
+import { useT } from '@open-mercato/shared/lib/i18n/context'
+import { useCallback } from 'react'
+
+export function useUnitDisplay() {
+  const t = useT()
+  return useCallback(
+    (unitValue: string): string => t(`catalog.unit.${unitValue}.short`, unitValue),
+    [t]
+  )
+}
+```
+
+**Integracja:**
+- `sales/components/documents/LineItemDialog.tsx` — selector jednostki używa `useUnitDisplay()`
+- `sales/components/documents/ItemsSection.tsx` — kolumna J.M. wyświetla short form
+- `sales/pdf/components/LinesTable.tsx` (Week 5) — same
+
+**Acceptance:**
+- Lista quotes pokazuje "10 szt." zamiast "10 pc"
+- Selector jednostek pokazuje polskie skróty z fallback'iem na value
+- New tenant z seed `Catalog units: 42` (40 + mb + t)
+- Idempotent re-seed — istniejące tenanty dostają nowe wartości bez duplikatów
+
+**Estimate:** 3 h
+
 ## Files to touch
 
 | Path | Action |
@@ -304,11 +359,19 @@ yarn build:app
 - [ ] 4.4 UI selector in `/backend/config/sales`
 - [ ] 4.5 Unit test all 4 fallback levels
 
-### Phase 5: Validation gate + PR (1 h)
+### Phase 5: PL units + i18n shorts (3 h)
 
-- [ ] 5.1 Full validation gate locally
-- [ ] 5.2 Open PR (base = Week 1 branch if not merged, else develop)
-- [ ] 5.3 Apply labels: `review`, `feature`, `needs-qa`
+- [ ] 5.1 Add `mb` + `t` to `UNIT_DEFAULTS` in `catalog/lib/seeds.ts`
+- [ ] 5.2 i18n shorts dla wszystkich units używanych w MVP (catalog/i18n/{pl,en,de,es}.json)
+- [ ] 5.3 NEW `catalog/lib/unitDisplay.ts` z `useUnitDisplay()` hook
+- [ ] 5.4 Integracja w `LineItemDialog.tsx` + `ItemsSection.tsx`
+- [ ] 5.5 Test: idempotent re-seed (40 → 42 units bez duplikatów)
+
+### Phase 6: Validation gate + PR (1 h)
+
+- [ ] 6.1 Full validation gate locally
+- [ ] 6.2 Open PR (base = Week 1 branch if not merged, else develop)
+- [ ] 6.3 Apply labels: `review`, `feature`, `needs-qa`
 
 ## Changelog
 
