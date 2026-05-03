@@ -33,6 +33,10 @@ const patchBodySchema = z
     isPrimary: z.boolean().optional(),
   })
   .passthrough()
+  .refine(
+    (payload) => !(payload.value !== undefined && payload.kind === undefined),
+    { message: 'Updating value requires kind to be provided as well so checksum can be re-validated.', path: ['kind'] },
+  )
 
 type SerializedTaxIdentity = {
   id: string
