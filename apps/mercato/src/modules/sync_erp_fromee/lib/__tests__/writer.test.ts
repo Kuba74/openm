@@ -486,3 +486,310 @@ describe('writeAllPlans + summarizeWrites', () => {
     expect(summary.failed).toBe(1)
   })
 })
+
+describe('Bug E — entity_roles persistence', () => {
+  const importerUserId = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'
+
+  it('zapisuje customer_entity_roles dla każdego role row gdy importerUserId to UUID', async () => {
+    const em = makeEm()
+    const commandBus = makeCommandBus({
+      'customers.companies.create': () => ({ entityId: 'new-uuid', companyId: 'profile-uuid' }),
+    })
+    const plan = buildPlan({
+      roles: {
+        skip: false,
+        rows: [
+          {
+            externalCompanyId: 'company_x',
+            organizationId: scope.organizationId,
+            tenantId: scope.tenantId,
+            entityType: 'company',
+            roleType: 'customer',
+          },
+          {
+            externalCompanyId: 'company_x',
+            organizationId: scope.organizationId,
+            tenantId: scope.tenantId,
+            entityType: 'company',
+            roleType: 'supplier',
+          },
+        ],
+        primaryLifecycleStage: 'customer',
+        warnings: [],
+      },
+    })
+    await writeImportPlan(plan, scope, {
+      em: em as never,
+      commandBus: commandBus as never,
+      container: { resolve: jest.fn() },
+      importerUserId,
+    })
+    const roleCreates = em.__created.filter((c) => c.entityName === 'CustomerEntityRole')
+    expect(roleCreates).toHaveLength(2)
+    expect(roleCreates.map((c) => c.payload.roleType).sort()).toEqual(['customer', 'supplier'])
+    expect(roleCreates.every((c) => c.payload.userId === importerUserId)).toBe(true)
+    expect(roleCreates.every((c) => c.payload.entityId === 'new-uuid')).toBe(true)
+  })
+
+  it('pomija entity_roles + warning gdy importerUserId nie jest UUIDem', async () => {
+    const em = makeEm()
+    const commandBus = makeCommandBus({
+      'customers.companies.create': () => ({ entityId: 'new-uuid', companyId: 'profile-uuid' }),
+    })
+    const plan = buildPlan({
+      roles: {
+        skip: false,
+        rows: [
+          {
+            externalCompanyId: 'company_x',
+            organizationId: scope.organizationId,
+            tenantId: scope.tenantId,
+            entityType: 'company',
+            roleType: 'customer',
+          },
+        ],
+        primaryLifecycleStage: 'customer',
+        warnings: [],
+      },
+    })
+    const result = await writeImportPlan(plan, scope, {
+      em: em as never,
+      commandBus: commandBus as never,
+      container: { resolve: jest.fn() },
+      importerUserId: 'erp-fromee-import',
+    })
+    const roleCreates = em.__created.filter((c) => c.entityName === 'CustomerEntityRole')
+    expect(roleCreates).toHaveLength(0)
+    expect(result.warnings.some((w) => w.includes('importerUserId not a UUID'))).toBe(true)
+  })
+
+  it('pomija entity_roles + warning gdy importerUserId nie podany', async () => {
+    const em = makeEm()
+    const commandBus = makeCommandBus({
+      'customers.companies.create': () => ({ entityId: 'new-uuid', companyId: 'profile-uuid' }),
+    })
+    const plan = buildPlan({
+      roles: {
+        skip: false,
+        rows: [
+          {
+            externalCompanyId: 'company_x',
+            organizationId: scope.organizationId,
+            tenantId: scope.tenantId,
+            entityType: 'company',
+            roleType: 'customer',
+          },
+        ],
+        primaryLifecycleStage: 'customer',
+        warnings: [],
+      },
+    })
+    const result = await writeImportPlan(plan, scope, {
+      em: em as never,
+      commandBus: commandBus as never,
+      container: { resolve: jest.fn() },
+    })
+    const roleCreates = em.__created.filter((c) => c.entityName === 'CustomerEntityRole')
+    expect(roleCreates).toHaveLength(0)
+    expect(result.warnings.some((w) => w.includes('--user'))).toBe(true)
+  })
+
+  it('failure pojedynczego role row nie blokuje pozostałych', async () => {
+    let flushCount = 0
+    const em = makeEm({
+      flush: jest.fn().mockImplementation(async () => {
+        flushCount += 1
+        if (flushCount === 3) throw new Error('unique violation')
+      }),
+    })
+    const commandBus = makeCommandBus({
+      'customers.companies.create': () => ({ entityId: 'new-uuid', companyId: 'profile-uuid' }),
+    })
+    const plan = buildPlan({
+      roles: {
+        skip: false,
+        rows: [
+          { externalCompanyId: 'company_x', organizationId: scope.organizationId, tenantId: scope.tenantId, entityType: 'company', roleType: 'customer' },
+          { externalCompanyId: 'company_x', organizationId: scope.organizationId, tenantId: scope.tenantId, entityType: 'company', roleType: 'supplier' },
+          { externalCompanyId: 'company_x', organizationId: scope.organizationId, tenantId: scope.tenantId, entityType: 'company', roleType: 'prospect' },
+        ],
+        primaryLifecycleStage: 'customer',
+        warnings: [],
+      },
+    })
+    const result = await writeImportPlan(plan, scope, {
+      em: em as never,
+      commandBus: commandBus as never,
+      container: { resolve: jest.fn() },
+      importerUserId,
+    })
+    expect(result.status).toBe('created')
+    expect(result.warnings.some((w) => w.includes('Failed entity role') && w.includes('unique violation'))).toBe(true)
+  })
+})
+
+describe('Bug F — tax identity normalization + isolated flushes', () => {
+  const importerUserId = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'
+
+  it('normalizuje NIP "631-259-75-19" → "6312597519" przed inserttem', async () => {
+    const em = makeEm()
+    const commandBus = makeCommandBus({
+      'customers.companies.create': () => ({ entityId: 'new-uuid', companyId: 'profile-uuid' }),
+    })
+    const plan = buildPlan({
+      taxIdentities: {
+        rows: [
+          {
+            externalId: 'company_x',
+            organizationId: scope.organizationId,
+            tenantId: scope.tenantId,
+            countryCode: 'PL',
+            kind: 'nip',
+            value: '631-259-75-19',
+            isPrimary: true,
+          },
+        ],
+        warnings: [],
+      },
+    })
+    await writeImportPlan(plan, scope, {
+      em: em as never,
+      commandBus: commandBus as never,
+      container: { resolve: jest.fn() },
+      importerUserId,
+    })
+    const taxCreate = em.__created.find((c) => c.entityName === 'CustomerTaxIdentity')
+    expect(taxCreate?.payload.value).toBe('6312597519')
+  })
+
+  it('failure jednego tax row nie usuwa pozostałych (Bug F regression)', async () => {
+    let flushCount = 0
+    const em = makeEm({
+      flush: jest.fn().mockImplementation(async () => {
+        flushCount += 1
+        // Pierwszy flush = entity profile update; drugi flush = tax row #1 → fail
+        if (flushCount === 2) throw new Error('unique violation')
+      }),
+    })
+    const commandBus = makeCommandBus({
+      'customers.companies.create': () => ({ entityId: 'new-uuid', companyId: 'profile-uuid' }),
+    })
+    const plan = buildPlan({
+      taxIdentities: {
+        rows: [
+          { externalId: 'company_x', organizationId: scope.organizationId, tenantId: scope.tenantId, countryCode: 'PL', kind: 'nip', value: '6312597519', isPrimary: true },
+          { externalId: 'company_x', organizationId: scope.organizationId, tenantId: scope.tenantId, countryCode: 'PL', kind: 'krs', value: '0000123456', isPrimary: false },
+        ],
+        warnings: [],
+      },
+    })
+    const result = await writeImportPlan(plan, scope, {
+      em: em as never,
+      commandBus: commandBus as never,
+      container: { resolve: jest.fn() },
+      importerUserId,
+    })
+    expect(result.status).toBe('created')
+    expect(result.warnings.some((w) => w.includes('Failed tax identity') && w.includes('unique violation'))).toBe(true)
+  })
+
+  it('puste tax value po normalizacji jest pomijane z warningiem', async () => {
+    const em = makeEm()
+    const commandBus = makeCommandBus({
+      'customers.companies.create': () => ({ entityId: 'new-uuid', companyId: 'profile-uuid' }),
+    })
+    const plan = buildPlan({
+      taxIdentities: {
+        rows: [
+          { externalId: 'company_x', organizationId: scope.organizationId, tenantId: scope.tenantId, countryCode: 'PL', kind: 'nip', value: '---', isPrimary: true },
+        ],
+        warnings: [],
+      },
+    })
+    const result = await writeImportPlan(plan, scope, {
+      em: em as never,
+      commandBus: commandBus as never,
+      container: { resolve: jest.fn() },
+      importerUserId,
+    })
+    const taxCreates = em.__created.filter((c) => c.entityName === 'CustomerTaxIdentity')
+    expect(taxCreates).toHaveLength(0)
+    expect(result.warnings.some((w) => w.includes('empty after normalization'))).toBe(true)
+  })
+
+  it('failure address row nie kasuje innych ancillary inserts (regression)', async () => {
+    const created: { entityName: string; payload: Record<string, unknown> }[] = []
+    const em: MockEm = {
+      fork: () => em,
+      findOne: jest.fn().mockResolvedValue(null),
+      create: jest.fn().mockImplementation((entity, payload) => {
+        const entityName = typeof entity === 'function' ? (entity as { name?: string }).name ?? 'unknown' : String(entity)
+        created.push({ entityName, payload })
+        return payload
+      }),
+      flush: jest.fn().mockImplementation(async () => {
+        // Fail flush WHEN ostatni create był CustomerAddress
+        const last = created[created.length - 1]
+        if (last?.entityName === 'CustomerAddress') {
+          throw new Error('address constraint')
+        }
+      }),
+      getReference: jest.fn().mockImplementation((_entity, id) => ({ __ref: id })),
+      __created: created,
+    }
+    const commandBus = makeCommandBus({
+      'customers.companies.create': () => ({ entityId: 'new-uuid', companyId: 'profile-uuid' }),
+    })
+    const plan = buildPlan({
+      addresses: {
+        rows: [
+          {
+            externalAddressId: 'addr_a',
+            externalCompanyId: 'company_x',
+            organizationId: scope.organizationId,
+            tenantId: scope.tenantId,
+            addressType: 'office',
+            label: null,
+            attentionOf: null,
+            name1: null,
+            name2: null,
+            street1: 'ul. Testowa 1',
+            street2: null,
+            postalCode: '00-001',
+            city: 'Warszawa',
+            region: null,
+            countryCode: 'PL',
+            isPrimary: true,
+          },
+        ],
+        warnings: [],
+      },
+      billing: {
+        row: {
+          externalCompanyId: 'company_x',
+          organizationId: scope.organizationId,
+          tenantId: scope.tenantId,
+          bankName: 'PKO',
+          bankAccountMasked: 'PL61 ********** 2874',
+          paymentTerms: null,
+          preferredCurrency: 'PLN',
+          salesOwnerUserId: null,
+          defaultOfferValidityDays: 30,
+          legacyExtras: { delivery_terms: null, price_group: null, credit_limit: null, primary_bank_external_id: null },
+        },
+        warnings: [],
+      },
+    })
+    const result = await writeImportPlan(plan, scope, {
+      em: em as never,
+      commandBus: commandBus as never,
+      container: { resolve: jest.fn() },
+      importerUserId,
+    })
+    expect(result.status).toBe('created')
+    expect(result.warnings.some((w) => w.includes('Failed address'))).toBe(true)
+    // Billing wciąż ląduje (mimo że address failed)
+    const billingCreates = em.__created.filter((c) => c.entityName === 'CustomerCompanyBilling')
+    expect(billingCreates).toHaveLength(1)
+  })
+})

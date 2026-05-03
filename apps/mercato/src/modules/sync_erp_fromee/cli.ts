@@ -52,14 +52,25 @@ const customersImportCommand: ModuleCli = {
     const args = parseArgs(rest)
     const tenantId = String(args.tenantId ?? args.tenant ?? '')
     const organizationId = String(args.organizationId ?? args.orgId ?? args.org ?? '')
+    const importerUserId = String(args.user ?? args.userId ?? '').trim() || undefined
     const dryRun = isTrue(args['dry-run']) || (!isTrue(args.commit) && !isTrue(args.write))
     const commit = isTrue(args.commit) || isTrue(args.write)
     const limitArg = args.limit
     const batchSizeArg = args['batch-size'] ?? args.batchSize
 
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
     if (!tenantId || !organizationId) {
       console.error(
-        'Usage: mercato sync_erp_fromee customers --tenant <tenantId> --org <organizationId> [--dry-run] [--commit] [--limit N] [--batch-size N]',
+        'Usage: mercato sync_erp_fromee customers --tenant <tenantId> --org <organizationId> --user <UUID> [--dry-run] [--commit] [--limit N] [--batch-size N]',
+      )
+      process.exitCode = 1
+      return
+    }
+
+    if (commit && (!importerUserId || !UUID_RE.test(importerUserId))) {
+      console.error(
+        '✗ --commit requires --user <UUID> (importer user id; trafia do customer_entity_roles.user_id which is NOT NULL).',
       )
       process.exitCode = 1
       return
@@ -124,6 +135,7 @@ const customersImportCommand: ModuleCli = {
           em,
           commandBus,
           container: { resolve: (name: string) => container.resolve(name) as never },
+          importerUserId,
         })
         writeSummary = writeResult.summary
         console.log(`✓ written: ${writeSummary.created}`)

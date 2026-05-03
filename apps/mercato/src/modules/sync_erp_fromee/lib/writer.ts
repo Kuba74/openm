@@ -5,10 +5,41 @@ import {
   CustomerCompanyBilling,
   CustomerCompanyProfile,
   CustomerEntity,
+  CustomerEntityRole,
   CustomerTaxIdentity,
 } from '@open-mercato/core/modules/customers/data/entities'
+import {
+  normalizeKrsForStorage,
+  normalizeNipForStorage,
+  normalizePeselForStorage,
+  normalizeRegonForStorage,
+  normalizeVatEuForStorage,
+} from '@open-mercato/core/modules/customers/data/taxIdentityChecksums'
 import type { CompanyImportPlan } from './pipeline'
 import type { ImportScope } from './types'
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+function isUuid(value: string | null | undefined): value is string {
+  return typeof value === 'string' && UUID_RE.test(value)
+}
+
+function normalizeTaxValue(kind: string, value: string): string {
+  switch (kind) {
+    case 'nip':
+      return normalizeNipForStorage(value)
+    case 'regon':
+      return normalizeRegonForStorage(value)
+    case 'krs':
+      return normalizeKrsForStorage(value)
+    case 'pesel':
+      return normalizePeselForStorage(value)
+    case 'vat_eu':
+      return normalizeVatEuForStorage(value)
+    default:
+      return value.trim()
+  }
+}
 
 /**
  * Wynik zapisu pojedynczej firmy. Pipeline strumieniuje plany, writer
@@ -102,10 +133,18 @@ async function findExistingEntityId(
  *   (przez command bus — preserves audit log + side effects)
  * - `customer_companies.legal_form` / `entity_type` / `full_address_krs`
  *   (direct EM update — nie ma ich w companyCreateSchema)
- * - `customer_tax_identities` (direct EM insert)
+ * - `customer_tax_identities` (direct EM insert, value normalizowany przez
+ *   `normalize{Nip,Regon,Krs,Pesel,VatEu}ForStorage` żeby canonical value
+ *   był taki sam jak by szła przez `customers.tax_identities.create`)
+ * - `customer_entity_roles` (direct EM insert; wymaga UUID `importerUserId`
+ *   bo schema ma `user_id NOT NULL`)
  * - `customer_addresses` (direct EM insert; `address_line1` required —
  *   pomijamy adresy bez `street1`)
  * - `customer_company_billing` (direct EM insert; tylko dla firm)
+ *
+ * Każdy ancillary insert jest izolowany (em.fork → flush per row) — failure
+ * jednego rekordu (np. unique-constraint conflict na NIP) nie zabija
+ * pozostałych ancillary'ek tej firmy.
  *
  * Co odkładamy na Y8:
  * - Person↔Company links (kontakty osobowe + `customer_person_company_*`)
@@ -256,16 +295,65 @@ export async function writeImportPlan(
 
     const entityRef = fork.getReference(CustomerEntity, entityId)
 
+    // Tax identities — flush per row, żeby unique-constraint na (country, kind, value)
+    // dla jednego rekordu nie zabił pozostałych. Bug F: jedno collision dropowało
+    // wszystkie tax_identities tej firmy.
     for (const tax of plan.taxIdentities.rows) {
-      fork.create(CustomerTaxIdentity, {
-        organizationId: tax.organizationId,
-        tenantId: tax.tenantId,
-        entity: entityRef,
-        countryCode: tax.countryCode,
-        kind: tax.kind,
-        value: tax.value,
-        isPrimary: tax.isPrimary,
-      })
+      try {
+        const normalizedValue = normalizeTaxValue(tax.kind, tax.value)
+        if (!normalizedValue) {
+          warnings.push(
+            `Skipped tax identity ${tax.kind}=${tax.value} (Company ${plan.externalCompanyId}): empty after normalization`,
+          )
+          continue
+        }
+        const sub = fork.fork()
+        sub.create(CustomerTaxIdentity, {
+          organizationId: tax.organizationId,
+          tenantId: tax.tenantId,
+          entity: sub.getReference(CustomerEntity, entityId),
+          countryCode: tax.countryCode,
+          kind: tax.kind,
+          value: normalizedValue,
+          isPrimary: tax.isPrimary,
+        })
+        await sub.flush()
+      } catch (err) {
+        warnings.push(
+          `Failed tax identity ${tax.kind}=${tax.value} (Company ${plan.externalCompanyId}): ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        )
+      }
+    }
+
+    // Bug E — entity_roles (customer/supplier classification per source CompanyRole).
+    // Schema wymaga user_id NOT NULL → używamy importerUserId (UUID wymagany).
+    if (isUuid(ctx.importerUserId)) {
+      for (const roleRow of plan.roles.rows) {
+        try {
+          const sub = fork.fork()
+          sub.create(CustomerEntityRole, {
+            organizationId: roleRow.organizationId,
+            tenantId: roleRow.tenantId,
+            entityType: roleRow.entityType,
+            entityId: entityId,
+            userId: ctx.importerUserId,
+            roleType: roleRow.roleType,
+          })
+          await sub.flush()
+        } catch (err) {
+          warnings.push(
+            `Failed entity role ${roleRow.roleType} (Company ${plan.externalCompanyId}): ${
+              err instanceof Error ? err.message : String(err)
+            }`,
+          )
+        }
+      }
+    } else if (plan.roles.rows.length > 0) {
+      warnings.push(
+        `Skipped ${plan.roles.rows.length} entity_role rows (Company ${plan.externalCompanyId}): importerUserId not a UUID — pass --user <UUID> to CLI`,
+      )
     }
 
     for (const addr of plan.addresses.rows) {
@@ -275,36 +363,54 @@ export async function writeImportPlan(
         )
         continue
       }
-      fork.create(CustomerAddress, {
-        organizationId: addr.organizationId,
-        tenantId: addr.tenantId,
-        entity: entityRef,
-        purpose: addr.addressType,
-        addressLine1: addr.street1,
-        addressLine2: addr.street2,
-        city: addr.city,
-        region: addr.region,
-        postalCode: addr.postalCode,
-        country: addr.countryCode,
-        isPrimary: addr.isPrimary,
-      })
+      try {
+        const sub = fork.fork()
+        sub.create(CustomerAddress, {
+          organizationId: addr.organizationId,
+          tenantId: addr.tenantId,
+          entity: sub.getReference(CustomerEntity, entityId),
+          purpose: addr.addressType,
+          addressLine1: addr.street1,
+          addressLine2: addr.street2,
+          city: addr.city,
+          region: addr.region,
+          postalCode: addr.postalCode,
+          country: addr.countryCode,
+          isPrimary: addr.isPrimary,
+        })
+        await sub.flush()
+      } catch (err) {
+        warnings.push(
+          `Failed address ${addr.externalAddressId} (Company ${plan.externalCompanyId}): ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        )
+      }
     }
 
     if (entityRow.kind === 'company' && plan.billing.row) {
-      fork.create(CustomerCompanyBilling, {
-        organizationId: plan.billing.row.organizationId,
-        tenantId: plan.billing.row.tenantId,
-        entity: entityRef,
-        bankName: plan.billing.row.bankName,
-        bankAccountMasked: plan.billing.row.bankAccountMasked,
-        paymentTerms: plan.billing.row.paymentTerms,
-        preferredCurrency: plan.billing.row.preferredCurrency,
-        salesOwnerUserId: plan.billing.row.salesOwnerUserId,
-        defaultOfferValidityDays: plan.billing.row.defaultOfferValidityDays,
-      })
+      try {
+        const sub = fork.fork()
+        sub.create(CustomerCompanyBilling, {
+          organizationId: plan.billing.row.organizationId,
+          tenantId: plan.billing.row.tenantId,
+          entity: sub.getReference(CustomerEntity, entityId),
+          bankName: plan.billing.row.bankName,
+          bankAccountMasked: plan.billing.row.bankAccountMasked,
+          paymentTerms: plan.billing.row.paymentTerms,
+          preferredCurrency: plan.billing.row.preferredCurrency,
+          salesOwnerUserId: plan.billing.row.salesOwnerUserId,
+          defaultOfferValidityDays: plan.billing.row.defaultOfferValidityDays,
+        })
+        await sub.flush()
+      } catch (err) {
+        warnings.push(
+          `Failed billing row (Company ${plan.externalCompanyId}): ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        )
+      }
     }
-
-    await fork.flush()
   } catch (error) {
     return {
       externalCompanyId: plan.externalCompanyId,
