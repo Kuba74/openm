@@ -215,8 +215,8 @@ None (no `--skill-url` provided).
 
 ### Phase 4: Commands
 
-- [ ] 4.1 Implement create / update / delete commands with undo
-- [ ] 4.2 Register commands in commands/index.ts
+- [x] 4.1 Implement create / update / delete commands with undo — c5a708401
+- [x] 4.2 Register commands in commands/index.ts — c5a708401
 
 ### Phase 5: API routes
 
