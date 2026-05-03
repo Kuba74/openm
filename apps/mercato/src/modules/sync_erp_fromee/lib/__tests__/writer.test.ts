@@ -7,7 +7,14 @@
  *  - skip-handling (plan-skip, manual-review, no-entity)
  *  - failure handling
  */
-import { writeImportPlan, writeAllPlans, summarizeWrites, buildSourceKey, SOURCE_PREFIX } from '../writer'
+import {
+  writeImportPlan,
+  writeAllPlans,
+  summarizeWrites,
+  buildSourceKey,
+  buildContactSourceKey,
+  SOURCE_PREFIX,
+} from '../writer'
 import type { CompanyImportPlan } from '../pipeline'
 import type { ImportScope } from '../types'
 
@@ -791,5 +798,297 @@ describe('Bug F — tax identity normalization + isolated flushes', () => {
     // Billing wciąż ląduje (mimo że address failed)
     const billingCreates = em.__created.filter((c) => c.entityName === 'CustomerCompanyBilling')
     expect(billingCreates).toHaveLength(1)
+  })
+})
+
+describe('Y8 — contacts writer (persons + links + roles)', () => {
+  const importerUserId = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'
+
+  function buildContactsPlan(): CompanyImportPlan {
+    return buildPlan({
+      contacts: {
+        persons: [
+          {
+            externalId: 'contact_1',
+            organizationId: scope.organizationId,
+            tenantId: scope.tenantId,
+            displayName: 'Jan Kowalski',
+            primaryEmail: 'jan@example.com',
+            primaryPhone: null,
+            isActive: true,
+            metadata: {},
+          },
+          {
+            externalId: 'contact_2',
+            organizationId: scope.organizationId,
+            tenantId: scope.tenantId,
+            displayName: 'Anna Nowak',
+            primaryEmail: null,
+            primaryPhone: null,
+            isActive: true,
+            metadata: {},
+          },
+        ],
+        profiles: [
+          { externalId: 'contact_1', firstName: 'Jan', lastName: 'Kowalski', jobTitle: null, department: null },
+          { externalId: 'contact_2', firstName: null, lastName: null, jobTitle: 'Architekt', department: null },
+        ],
+        links: [
+          {
+            externalContactId: 'contact_1',
+            externalCompanyId: 'company_x',
+            organizationId: scope.organizationId,
+            tenantId: scope.tenantId,
+            isPrimary: true,
+          },
+          {
+            externalContactId: 'contact_2',
+            externalCompanyId: 'company_x',
+            organizationId: scope.organizationId,
+            tenantId: scope.tenantId,
+            isPrimary: false,
+          },
+        ],
+        roles: [
+          {
+            externalContactId: 'contact_1',
+            externalCompanyId: 'company_x',
+            organizationId: scope.organizationId,
+            tenantId: scope.tenantId,
+            roleValue: 'sales',
+          },
+          {
+            externalContactId: 'contact_2',
+            externalCompanyId: 'company_x',
+            organizationId: scope.organizationId,
+            tenantId: scope.tenantId,
+            roleValue: 'architect',
+          },
+        ],
+        warnings: [],
+      },
+    })
+  }
+
+  it('buildContactSourceKey formats z prefiksem erp_fromee:contact:', () => {
+    expect(buildContactSourceKey('contact_xxx')).toBe('erp_fromee:contact:contact_xxx')
+  })
+
+  it('woła customers.people.create per contact, każdy z source = erp_fromee:contact:<id>', async () => {
+    const em = makeEm()
+    let personCounter = 0
+    const peopleCreated: Record<string, unknown>[] = []
+    const commandBus = {
+      execute: jest.fn().mockImplementation(async (commandId: string, options: { input: Record<string, unknown> }) => {
+        if (commandId === 'customers.companies.create') {
+          return { result: { entityId: 'company-uuid', companyId: 'profile-uuid' }, logEntry: null }
+        }
+        if (commandId === 'customers.people.create') {
+          peopleCreated.push(options.input)
+          personCounter += 1
+          return { result: { entityId: `person-uuid-${personCounter}`, personId: `pp-${personCounter}` }, logEntry: null }
+        }
+        throw new Error(`No mock for ${commandId}`)
+      }),
+    }
+    await writeImportPlan(buildContactsPlan(), scope, {
+      em: em as never,
+      commandBus: commandBus as never,
+      container: { resolve: jest.fn() },
+      importerUserId,
+    })
+    expect(peopleCreated).toHaveLength(2)
+    expect(peopleCreated[0].source).toBe('erp_fromee:contact:contact_1')
+    expect(peopleCreated[0].firstName).toBe('Jan')
+    expect(peopleCreated[0].lastName).toBe('Kowalski')
+    // Contact 2 — fallback split z displayName
+    expect(peopleCreated[1].firstName).toBe('Anna')
+    expect(peopleCreated[1].lastName).toBe('Nowak')
+    expect(peopleCreated[1].source).toBe('erp_fromee:contact:contact_2')
+  })
+
+  it('zapisuje customer_person_company_links per link row', async () => {
+    const em = makeEm()
+    let personCounter = 0
+    const commandBus = {
+      execute: jest.fn().mockImplementation(async (commandId: string) => {
+        if (commandId === 'customers.companies.create') {
+          return { result: { entityId: 'company-uuid', companyId: 'profile-uuid' }, logEntry: null }
+        }
+        personCounter += 1
+        return { result: { entityId: `person-uuid-${personCounter}`, personId: `pp-${personCounter}` }, logEntry: null }
+      }),
+    }
+    await writeImportPlan(buildContactsPlan(), scope, {
+      em: em as never,
+      commandBus: commandBus as never,
+      container: { resolve: jest.fn() },
+      importerUserId,
+    })
+    const linkCreates = em.__created.filter((c) => c.entityName === 'CustomerPersonCompanyLink')
+    expect(linkCreates).toHaveLength(2)
+    expect(linkCreates.filter((c) => c.payload.isPrimary)).toHaveLength(1)
+  })
+
+  it('zapisuje customer_person_company_roles per role row z mapper-derived roleValue', async () => {
+    const em = makeEm()
+    let personCounter = 0
+    const commandBus = {
+      execute: jest.fn().mockImplementation(async (commandId: string) => {
+        if (commandId === 'customers.companies.create') {
+          return { result: { entityId: 'company-uuid', companyId: 'profile-uuid' }, logEntry: null }
+        }
+        personCounter += 1
+        return { result: { entityId: `person-uuid-${personCounter}`, personId: `pp-${personCounter}` }, logEntry: null }
+      }),
+    }
+    await writeImportPlan(buildContactsPlan(), scope, {
+      em: em as never,
+      commandBus: commandBus as never,
+      container: { resolve: jest.fn() },
+      importerUserId,
+    })
+    const roleCreates = em.__created.filter((c) => c.entityName === 'CustomerPersonCompanyRole')
+    expect(roleCreates).toHaveLength(2)
+    expect(roleCreates.map((c) => c.payload.roleValue).sort()).toEqual(['architect', 'sales'])
+  })
+
+  it('idempotency: jeśli person już istnieje (po source key), pomija create + linkuje do istniejącego', async () => {
+    const em = makeEm({
+      // findOne: pierwszy zwrot (entity check) = null; następne (person idempotency) zwracają existing
+      findOne: jest.fn().mockImplementation(async (_entity: unknown, where: Record<string, unknown>) => {
+        if (typeof where.source === 'string' && where.source.startsWith('erp_fromee:contact:')) {
+          return { id: `existing-person-${where.source}` }
+        }
+        return null
+      }),
+    })
+    const peopleCreated: Record<string, unknown>[] = []
+    const commandBus = {
+      execute: jest.fn().mockImplementation(async (commandId: string, options: { input: Record<string, unknown> }) => {
+        if (commandId === 'customers.companies.create') {
+          return { result: { entityId: 'company-uuid', companyId: 'profile-uuid' }, logEntry: null }
+        }
+        peopleCreated.push(options.input)
+        return { result: { entityId: 'never-called', personId: 'never' }, logEntry: null }
+      }),
+    }
+    await writeImportPlan(buildContactsPlan(), scope, {
+      em: em as never,
+      commandBus: commandBus as never,
+      container: { resolve: jest.fn() },
+      importerUserId,
+    })
+    expect(peopleCreated).toHaveLength(0) // żaden create — wszystkie idempotent-skip
+    // Linki nadal lądują (do existing person ID)
+    const linkCreates = em.__created.filter((c) => c.entityName === 'CustomerPersonCompanyLink')
+    expect(linkCreates).toHaveLength(2)
+  })
+
+  it('skip contact + warning gdy displayName ma 1 słowo i brak first/last w profile', async () => {
+    const em = makeEm()
+    const commandBus = {
+      execute: jest.fn().mockImplementation(async (commandId: string) => {
+        if (commandId === 'customers.companies.create') {
+          return { result: { entityId: 'company-uuid', companyId: 'profile-uuid' }, logEntry: null }
+        }
+        return { result: { entityId: 'p-uuid', personId: 'pp' }, logEntry: null }
+      }),
+    }
+    const plan = buildPlan({
+      contacts: {
+        persons: [{
+          externalId: 'contact_x',
+          organizationId: scope.organizationId,
+          tenantId: scope.tenantId,
+          displayName: 'Madonna',
+          primaryEmail: null,
+          primaryPhone: null,
+          isActive: true,
+          metadata: {},
+        }],
+        profiles: [{ externalId: 'contact_x', firstName: null, lastName: null, jobTitle: null, department: null }],
+        links: [{ externalContactId: 'contact_x', externalCompanyId: 'company_x', organizationId: scope.organizationId, tenantId: scope.tenantId, isPrimary: true }],
+        roles: [],
+        warnings: [],
+      },
+    })
+    const result = await writeImportPlan(plan, scope, {
+      em: em as never,
+      commandBus: commandBus as never,
+      container: { resolve: jest.fn() },
+      importerUserId,
+    })
+    expect(result.warnings.some((w) => w.includes('cannot derive firstName + lastName'))).toBe(true)
+    // Skip propaguje się: link/role do tego contactu też nie powstaje
+    const linkCreates = em.__created.filter((c) => c.entityName === 'CustomerPersonCompanyLink')
+    expect(linkCreates).toHaveLength(0)
+  })
+
+  it('failure jednego contact create nie blokuje pozostałych', async () => {
+    const em = makeEm()
+    let personCounter = 0
+    const commandBus = {
+      execute: jest.fn().mockImplementation(async (commandId: string, options: { input: Record<string, unknown> }) => {
+        if (commandId === 'customers.companies.create') {
+          return { result: { entityId: 'company-uuid', companyId: 'profile-uuid' }, logEntry: null }
+        }
+        personCounter += 1
+        if (personCounter === 1) throw new Error('email duplicate')
+        return { result: { entityId: `person-uuid-${personCounter}`, personId: `pp-${personCounter}` }, logEntry: null }
+      }),
+    }
+    const result = await writeImportPlan(buildContactsPlan(), scope, {
+      em: em as never,
+      commandBus: commandBus as never,
+      container: { resolve: jest.fn() },
+      importerUserId,
+    })
+    expect(result.status).toBe('created')
+    expect(result.warnings.some((w) => w.includes('Failed contact contact_1') && w.includes('email duplicate'))).toBe(true)
+    // Drugi contact nadal trafia
+    const linkCreates = em.__created.filter((c) => c.entityName === 'CustomerPersonCompanyLink')
+    expect(linkCreates).toHaveLength(1) // tylko contact_2
+  })
+
+  it('pomija contacts gdy plan.partner.entity.kind === "person" (kontakty są tylko dla firm)', async () => {
+    const em = makeEm()
+    const commandBus = makeCommandBus({
+      'customers.people.create': () => ({ entityId: 'p-uuid', personId: 'pp' }),
+    })
+    const plan = buildPlan({
+      partner: {
+        skip: false,
+        warnings: [],
+        entity: {
+          externalId: 'company_x',
+          organizationId: scope.organizationId,
+          tenantId: scope.tenantId,
+          kind: 'person',
+          displayName: 'Jan Kowalski',
+          description: null,
+          primaryEmail: null,
+          primaryPhone: null,
+          isActive: true,
+          metadata: {},
+        },
+        profile: { kind: 'person', firstName: 'Jan', lastName: 'Kowalski' },
+      },
+      contacts: {
+        persons: [{ externalId: 'c1', organizationId: scope.organizationId, tenantId: scope.tenantId, displayName: 'X Y', primaryEmail: null, primaryPhone: null, isActive: true, metadata: {} }],
+        profiles: [{ externalId: 'c1', firstName: 'X', lastName: 'Y', jobTitle: null, department: null }],
+        links: [{ externalContactId: 'c1', externalCompanyId: 'company_x', organizationId: scope.organizationId, tenantId: scope.tenantId, isPrimary: true }],
+        roles: [],
+        warnings: [],
+      },
+    })
+    await writeImportPlan(plan, scope, {
+      em: em as never,
+      commandBus: commandBus as never,
+      container: { resolve: jest.fn() },
+      importerUserId,
+    })
+    const linkCreates = em.__created.filter((c) => c.entityName === 'CustomerPersonCompanyLink')
+    expect(linkCreates).toHaveLength(0) // person-kind partner → contacts skipped
   })
 })

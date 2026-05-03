@@ -6,6 +6,8 @@ import {
   CustomerCompanyProfile,
   CustomerEntity,
   CustomerEntityRole,
+  CustomerPersonCompanyLink,
+  CustomerPersonCompanyRole,
   CustomerTaxIdentity,
 } from '@open-mercato/core/modules/customers/data/entities'
 import {
@@ -86,6 +88,10 @@ export function buildSourceKey(externalCompanyId: string): string {
   return `${SOURCE_PREFIX}:${externalCompanyId}`
 }
 
+export function buildContactSourceKey(externalContactId: string): string {
+  return `${SOURCE_PREFIX}:contact:${externalContactId}`
+}
+
 function buildCommandContext(ctx: WriteImportPlanContext, scope: ImportScope): unknown {
   return {
     container: ctx.container,
@@ -146,12 +152,16 @@ async function findExistingEntityId(
  * jednego rekordu (np. unique-constraint conflict na NIP) nie zabija
  * pozostałych ancillary'ek tej firmy.
  *
- * Co odkładamy na Y8:
- * - Person↔Company links (kontakty osobowe + `customer_person_company_*`)
- * - `customer_entities.metadata` blob (column nie istnieje — wymaga
- *   migracji lub osobnej tabeli)
- * - Multi-source `external_links` array (D3) — używamy single `source`
- *   field jako idempotency anchor
+ * Y8 — kontakty osobowe:
+ * - `customer_people` (przez `customers.people.create` command, source =
+ *   'erp_fromee:contact:<id>' jako idempotency anchor)
+ * - `customer_person_company_links` (M:N person↔company; D6 first-wins
+ *   pre-applied w mapperze)
+ * - `customer_person_company_roles` (Architekt → 'architect' itd.)
+ *
+ * Co odkładamy na Y8a (out of scope tego PR):
+ * - `customer_entities.metadata` blob (column nie istnieje — wymaga migracji)
+ * - Multi-source `external_links` array (D3) — używamy single `source` field
  *
  * Encryption (D11):
  * - Plain IBAN nie jest persistowany (mapper banks emituje go tylko dla
@@ -409,6 +419,118 @@ export async function writeImportPlan(
             err instanceof Error ? err.message : String(err)
           }`,
         )
+      }
+    }
+
+    // Y8: contacts → customer_people + customer_person_company_links + customer_person_company_roles
+    // Person idempotency anchor: customer_entities.source = 'erp_fromee:contact:<contactId>'.
+    // Person↔company link unique: (person_entity_id, company_entity_id) where deleted_at IS NULL.
+    if (entityRow.kind === 'company' && plan.contacts.persons.length > 0) {
+      const personIdByContactId = new Map<string, string>()
+
+      for (const person of plan.contacts.persons) {
+        const profile = plan.contacts.profiles.find((p) => p.externalId === person.externalId)
+        const personSourceKey = buildContactSourceKey(person.externalId)
+        try {
+          // Idempotency check
+          const sub = fork.fork()
+          const existing = await sub.findOne(CustomerEntity, {
+            source: personSourceKey,
+            tenantId: scope.tenantId,
+            organizationId: scope.organizationId,
+            deletedAt: null,
+          } as Record<string, unknown>)
+          if (existing) {
+            personIdByContactId.set(person.externalId, existing.id)
+            continue
+          }
+
+          // Derive firstName/lastName: explicit profile fields first, fallback z displayName.
+          const explicitFirst = profile?.firstName?.trim() ?? null
+          const explicitLast = profile?.lastName?.trim() ?? null
+          const split = person.displayName.trim().split(/\s+/)
+          const firstName = explicitFirst || split[0] || ''
+          const lastName = explicitLast || split.slice(1).join(' ') || ''
+          if (!firstName || !lastName) {
+            warnings.push(
+              `Skipped contact ${person.externalId} (Company ${plan.externalCompanyId}): cannot derive firstName + lastName from "${person.displayName}"`,
+            )
+            continue
+          }
+
+          const cmd = await ctx.commandBus.execute<
+            Record<string, unknown>,
+            { entityId: string; personId: string }
+          >(
+            'customers.people.create',
+            {
+              input: {
+                organizationId: scope.organizationId,
+                tenantId: scope.tenantId,
+                firstName,
+                lastName,
+                primaryEmail: person.primaryEmail ?? undefined,
+                primaryPhone: person.primaryPhone ?? undefined,
+                isActive: person.isActive,
+                source: personSourceKey,
+              },
+              ctx: cmdCtx as never,
+            },
+          )
+          personIdByContactId.set(person.externalId, cmd.result.entityId)
+        } catch (err) {
+          warnings.push(
+            `Failed contact ${person.externalId} (Company ${plan.externalCompanyId}): ${
+              err instanceof Error ? err.message : String(err)
+            }`,
+          )
+        }
+      }
+
+      // Person↔Company links — primary handling już zrobiony w mapperze (D6 first-wins).
+      for (const link of plan.contacts.links) {
+        const personId = personIdByContactId.get(link.externalContactId)
+        if (!personId) continue // person creation failed earlier — already warned
+        try {
+          const sub = fork.fork()
+          sub.create(CustomerPersonCompanyLink, {
+            organizationId: link.organizationId,
+            tenantId: link.tenantId,
+            person: sub.getReference(CustomerEntity, personId),
+            company: sub.getReference(CustomerEntity, entityId),
+            isPrimary: link.isPrimary,
+          })
+          await sub.flush()
+        } catch (err) {
+          warnings.push(
+            `Failed person↔company link (contact ${link.externalContactId}, company ${plan.externalCompanyId}): ${
+              err instanceof Error ? err.message : String(err)
+            }`,
+          )
+        }
+      }
+
+      // Person↔Company role rows (Architekt → architect, etc).
+      for (const roleRow of plan.contacts.roles) {
+        const personId = personIdByContactId.get(roleRow.externalContactId)
+        if (!personId) continue
+        try {
+          const sub = fork.fork()
+          sub.create(CustomerPersonCompanyRole, {
+            organizationId: roleRow.organizationId,
+            tenantId: roleRow.tenantId,
+            personEntity: sub.getReference(CustomerEntity, personId),
+            companyEntity: sub.getReference(CustomerEntity, entityId),
+            roleValue: roleRow.roleValue,
+          })
+          await sub.flush()
+        } catch (err) {
+          warnings.push(
+            `Failed person company role (contact ${roleRow.externalContactId}, company ${plan.externalCompanyId}): ${
+              err instanceof Error ? err.message : String(err)
+            }`,
+          )
+        }
       }
     }
   } catch (error) {
