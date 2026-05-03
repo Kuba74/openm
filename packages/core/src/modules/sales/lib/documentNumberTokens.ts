@@ -1,10 +1,10 @@
 export type SalesDocumentNumberKind = 'quote' | 'order' | 'return' | 'invoice' | 'credit_memo'
 
-export const DEFAULT_ORDER_NUMBER_FORMAT = 'ORDER-{yyyy}{mm}{dd}-{seq:5}'
-export const DEFAULT_QUOTE_NUMBER_FORMAT = 'QUOTE-{yyyy}{mm}{dd}-{seq:5}'
-export const DEFAULT_RETURN_NUMBER_FORMAT = 'RET-{yyyy}{mm}{dd}-{seq:5}'
-export const DEFAULT_INVOICE_NUMBER_FORMAT = 'INV-{yyyy}{mm}{dd}-{seq:5}'
-export const DEFAULT_CREDIT_MEMO_NUMBER_FORMAT = 'CM-{yyyy}{mm}{dd}-{seq:5}'
+export const DEFAULT_QUOTE_NUMBER_FORMAT = 'OF/{yyyy}/{seq:5}'
+export const DEFAULT_ORDER_NUMBER_FORMAT = 'ZS/{yyyy}/{seq:5}'
+export const DEFAULT_INVOICE_NUMBER_FORMAT = 'FV/{yyyy}/{mm}/{seq:5}'
+export const DEFAULT_RETURN_NUMBER_FORMAT = 'KOR/{yyyy}/{seq:5}'
+export const DEFAULT_CREDIT_MEMO_NUMBER_FORMAT = 'KFV/{yyyy}/{mm}/{seq:5}'
 
 export const DOCUMENT_NUMBER_TOKENS: Array<{ token: string; description: string }> = [
   { token: '{yyyy}', description: '4-digit year, e.g. 2025' },

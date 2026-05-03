@@ -22,7 +22,7 @@ export type JdgReclassResult = {
   details: JdgReclassDetail[]
 }
 
-const PL_NIP_KIND = 'NIP'
+const PL_NIP_KIND = 'nip' as const
 const PL_COUNTRY = 'PL'
 const JDG_LEGAL_FORM = 'jdg'
 

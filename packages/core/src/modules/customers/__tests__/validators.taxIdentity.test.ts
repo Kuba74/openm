@@ -5,9 +5,9 @@ import {
 } from '../data/validators'
 
 const validScope = {
-  organizationId: '00000000-0000-0000-0000-000000000001',
-  tenantId: '00000000-0000-0000-0000-000000000002',
-  entityId: '00000000-0000-0000-0000-000000000003',
+  organizationId: 'a1111111-2222-4333-8444-555555555551',
+  tenantId: 'a1111111-2222-4333-8444-555555555552',
+  entityId: 'a1111111-2222-4333-8444-555555555553',
 }
 
 describe('taxIdentityCreateSchema', () => {
@@ -74,7 +74,7 @@ describe('taxIdentityUpdateSchema', () => {
     const result = taxIdentityUpdateSchema.safeParse({
       organizationId: validScope.organizationId,
       tenantId: validScope.tenantId,
-      id: '00000000-0000-0000-0000-000000000099',
+      id: 'a1111111-2222-4333-8444-555555555599',
       isPrimary: true,
     })
     expect(result.success).toBe(true)
@@ -84,10 +84,10 @@ describe('taxIdentityUpdateSchema', () => {
     const result = taxIdentityUpdateSchema.safeParse({
       organizationId: validScope.organizationId,
       tenantId: validScope.tenantId,
-      id: '00000000-0000-0000-0000-000000000099',
+      id: 'a1111111-2222-4333-8444-555555555599',
       kind: 'nip',
       countryCode: 'PL',
-      value: '0000000000',
+      value: '5260250996',
     })
     expect(result.success).toBe(false)
   })

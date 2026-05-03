@@ -4,8 +4,11 @@ import { SalesTaxRate } from '../data/entities'
 export type SalesSeedScope = { tenantId: string; organizationId: string }
 
 const DEFAULT_TAX_RATES = [
-  { code: 'vat-23', name: '23% VAT', rate: '23' },
-  { code: 'vat-0', name: '0% VAT', rate: '0' },
+  { code: 'vat-23', name: '23% VAT', rate: '23', isExempt: false },
+  { code: 'vat-8', name: '8% VAT', rate: '8', isExempt: false },
+  { code: 'vat-5', name: '5% VAT', rate: '5', isExempt: false },
+  { code: 'vat-0', name: '0% VAT', rate: '0', isExempt: false },
+  { code: 'vat-zw', name: 'Zwolnione (zw.)', rate: '0', isExempt: true },
 ] as const
 
 export async function seedSalesTaxRates(
@@ -31,7 +34,8 @@ export async function seedSalesTaxRates(
       name: def.name,
       code: def.code,
       rate: def.rate,
-      countryCode: null,
+      isExempt: def.isExempt,
+      countryCode: 'PL',
       regionCode: null,
       postalCode: null,
       city: null,

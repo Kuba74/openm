@@ -1,6 +1,13 @@
 import { Collection, OptionalProps } from '@mikro-orm/core'
 import { Entity, Index, ManyToOne, OneToMany, PrimaryKey, Property, Unique } from '@mikro-orm/decorators/legacy'
-import { DEFAULT_ORDER_NUMBER_FORMAT, DEFAULT_QUOTE_NUMBER_FORMAT, type SalesDocumentNumberKind } from '../lib/documentNumberTokens'
+import {
+  DEFAULT_ORDER_NUMBER_FORMAT,
+  DEFAULT_QUOTE_NUMBER_FORMAT,
+  DEFAULT_INVOICE_NUMBER_FORMAT,
+  DEFAULT_RETURN_NUMBER_FORMAT,
+  DEFAULT_CREDIT_MEMO_NUMBER_FORMAT,
+  type SalesDocumentNumberKind,
+} from '../lib/documentNumberTokens'
 import type { ShipmentItemSnapshot } from '../lib/shipments/types'
 import type { SalesLineUomSnapshot } from '../lib/types'
 
@@ -256,6 +263,8 @@ export class SalesPaymentMethod {
 @Index({ name: 'sales_tax_rates_scope_idx', properties: ['organizationId', 'tenantId'] })
 @Unique({ name: 'sales_tax_rates_code_unique', properties: ['organizationId', 'tenantId', 'code'] })
 export class SalesTaxRate {
+  [OptionalProps]?: 'isExempt'
+
   @PrimaryKey({ type: 'uuid', defaultRaw: 'gen_random_uuid()' })
   id!: string
 
@@ -303,6 +312,9 @@ export class SalesTaxRate {
 
   @Property({ name: 'is_default', type: 'boolean', default: false })
   isDefault: boolean = false
+
+  @Property({ name: 'is_exempt', type: 'boolean', default: false })
+  isExempt: boolean = false
 
   @Property({ name: 'metadata', type: 'jsonb', nullable: true })
   metadata?: Record<string, unknown> | null
@@ -753,7 +765,7 @@ export class SalesOrderAdjustment {
 @Entity({ tableName: 'sales_settings' })
 @Unique({ name: 'sales_settings_scope_unique', properties: ['organizationId', 'tenantId'] })
 export class SalesSettings {
-  [OptionalProps]?: 'createdAt' | 'updatedAt'
+  [OptionalProps]?: 'createdAt' | 'updatedAt' | 'invoiceNumberFormat' | 'returnNumberFormat' | 'creditMemoNumberFormat' | 'defaultCurrencyCode'
 
   @PrimaryKey({ type: 'uuid', defaultRaw: 'gen_random_uuid()' })
   id!: string
@@ -769,6 +781,18 @@ export class SalesSettings {
 
   @Property({ name: 'quote_number_format', type: 'text', default: DEFAULT_QUOTE_NUMBER_FORMAT })
   quoteNumberFormat: string = DEFAULT_QUOTE_NUMBER_FORMAT
+
+  @Property({ name: 'invoice_number_format', type: 'text', default: DEFAULT_INVOICE_NUMBER_FORMAT })
+  invoiceNumberFormat: string = DEFAULT_INVOICE_NUMBER_FORMAT
+
+  @Property({ name: 'return_number_format', type: 'text', default: DEFAULT_RETURN_NUMBER_FORMAT })
+  returnNumberFormat: string = DEFAULT_RETURN_NUMBER_FORMAT
+
+  @Property({ name: 'credit_memo_number_format', type: 'text', default: DEFAULT_CREDIT_MEMO_NUMBER_FORMAT })
+  creditMemoNumberFormat: string = DEFAULT_CREDIT_MEMO_NUMBER_FORMAT
+
+  @Property({ name: 'default_currency_code', type: 'text', nullable: true })
+  defaultCurrencyCode?: string | null
 
   @Property({ name: 'order_customer_editable_statuses', type: 'jsonb', nullable: true })
   orderCustomerEditableStatuses?: string[] | null
