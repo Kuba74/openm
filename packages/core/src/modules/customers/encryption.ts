@@ -66,6 +66,13 @@ export const defaultEncryptionMaps: ModuleEncryptionMap[] = [
       { field: 'domain' },
       { field: 'website_url' },
       { field: 'industry' },
+      { field: 'full_address_krs' },
+    ],
+  },
+  {
+    entityId: 'customers:customer_tax_identity',
+    fields: [
+      { field: 'value' },
     ],
   },
 ]

@@ -126,6 +126,8 @@ const DICTIONARY_KINDS = new Set([
   'pipeline_stage',
   'job_title',
   'industry',
+  'legal_form',
+  'entity_type',
 ])
 
 export async function ensureDictionaryEntry(
@@ -143,6 +145,8 @@ export async function ensureDictionaryEntry(
       | 'pipeline_stage'
       | 'job_title'
       | 'industry'
+      | 'legal_form'
+      | 'entity_type'
     value: string
     label?: string | null
     color?: string | null | undefined

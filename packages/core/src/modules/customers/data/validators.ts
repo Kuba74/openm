@@ -237,6 +237,8 @@ const dictionaryKindEnum = z.enum([
   'pipeline_stage',
   'job_title',
   'industry',
+  'legal_form',
+  'entity_type',
 ])
 
 const dictionaryValueSchema = z.string().trim().min(1).max(150)

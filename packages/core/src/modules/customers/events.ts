@@ -48,6 +48,11 @@ const events = [
   { id: 'customers.todo.updated', label: 'Todo Updated', entity: 'todo', category: 'crud' },
   { id: 'customers.todo.deleted', label: 'Todo Deleted', entity: 'todo', category: 'crud' },
 
+  // Tax identities (Partner master Phase 1)
+  { id: 'customers.tax_identity.created', label: 'Tax Identity Created', entity: 'tax_identity', category: 'crud' },
+  { id: 'customers.tax_identity.updated', label: 'Tax Identity Updated', entity: 'tax_identity', category: 'crud' },
+  { id: 'customers.tax_identity.deleted', label: 'Tax Identity Deleted', entity: 'tax_identity', category: 'crud' },
+
   // Interactions (canonical)
   { id: 'customers.interaction.created', label: 'Interaction Created', entity: 'interaction', category: 'crud' },
   { id: 'customers.interaction.updated', label: 'Interaction Updated', entity: 'interaction', category: 'crud' },

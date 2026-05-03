@@ -40,6 +40,21 @@ export const CUSTOMER_COMPANY_CUSTOM_FIELDS = [
     description: 'The customer has approved participation in marketing collateral.',
     defaultValue: false,
   }),
+  cf.text('legal_form', {
+    label: 'Legal form',
+    description: 'Dictionary-backed legal form (sp_z_oo, s_a, gmbh, jdg, …).',
+    filterable: true,
+  }),
+  cf.text('entity_type', {
+    label: 'Entity type',
+    description: 'Dictionary-backed business role (manufacturer, distributor, retailer, …).',
+    filterable: true,
+  }),
+  cf.text('full_address_krs', {
+    label: 'KRS registered address',
+    description: 'Full registered address as listed in the Polish KRS court registry.',
+    listVisible: false,
+  }),
 ]
 
 export const CUSTOMER_DEAL_CUSTOM_FIELDS = [
