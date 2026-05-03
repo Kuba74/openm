@@ -3,6 +3,7 @@ import {
   CustomerCompanyProfile,
   CustomerEntity,
   CustomerTaxIdentity,
+  type CustomerTaxIdentityKind,
 } from '@open-mercato/core/modules/customers/data/entities'
 
 export type JdgReclassScope = {
@@ -22,7 +23,7 @@ export type JdgReclassResult = {
   details: JdgReclassDetail[]
 }
 
-const PL_NIP_KIND = 'nip' as const
+const PL_NIP_KIND: CustomerTaxIdentityKind = 'nip'
 const PL_COUNTRY = 'PL'
 const JDG_LEGAL_FORM = 'jdg'
 
