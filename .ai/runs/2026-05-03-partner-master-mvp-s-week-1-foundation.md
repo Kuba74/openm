@@ -109,8 +109,8 @@ None — this run honours the brief from `auto-create-pr` and the source spec; n
 
 ### Phase 1: Lifecycle stage dictionary defaults
 
-- [ ] 1.1 Add `supplier`, `partner`, `carrier`, `internal`, `other` to `ENTITY_LIFECYCLE_STAGE_DEFAULTS`
-- [ ] 1.2 Confirm `seedCustomerDictionaries` is idempotent across a re-run (manual diff)
+- [x] 1.1 Add `supplier`, `partner`, `carrier`, `internal`, `other` to `ENTITY_LIFECYCLE_STAGE_DEFAULTS` — 99c6f7e16
+- [x] 1.2 Confirm `seedCustomerDictionaries` is idempotent across a re-run (manual diff) — 99c6f7e16
 
 ### Phase 2: JDG reclassification helper + upgrade action
 
