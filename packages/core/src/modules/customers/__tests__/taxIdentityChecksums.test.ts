@@ -26,7 +26,7 @@ describe('isValidNip', () => {
   })
 
   it('rejects a NIP whose modulo is ten', () => {
-    expect(isValidNip('1111111111')).toBe(false)
+    expect(isValidNip('1234567890')).toBe(false)
   })
 
   it('rejects non-digit characters that cannot be stripped to ten digits', () => {
