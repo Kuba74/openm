@@ -1,5 +1,6 @@
 import type { ModuleInfo } from '@open-mercato/shared/modules/registry'
 import './commands'
+import './upgrade-actions'
 
 export const metadata: ModuleInfo = {
   name: 'customers',
