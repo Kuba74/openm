@@ -1,6 +1,6 @@
 # Run Plan — Partner Master MVP-S Week 1 Foundation
 
-**Status:** in-progress
+**Status:** in-progress (validation gate blocked by sandbox; reviewer to rerun locally)
 **Created:** 2026-05-03
 **Author:** Kuba74 (auto-create-pr)
 **Source spec:** [.ai/specs/2026-05-03-mvp-s-week-1-partner-foundation.md](../specs/2026-05-03-mvp-s-week-1-partner-foundation.md) — lives on `origin/docs/partner-master-migration-spec`, not on the base branch
@@ -121,10 +121,11 @@ None — this run honours the brief from `auto-create-pr` and the source spec; n
 
 ### Phase 3: Validation gate + PR
 
-- [ ] 3.1 Run `yarn build:packages`, `yarn typecheck`, `yarn test`, `yarn i18n:check-sync` — capture pass/fail/blocked status
-- [ ] 3.2 Open the stacked PR against `feat/partner-master-phase-1-tax-identity`
-- [ ] 3.3 Apply labels: `review`, `feature`, `needs-qa`
+- [x] 3.1 Run `yarn build:packages`, `yarn typecheck`, `yarn test`, `yarn i18n:check-sync` — **BLOCKED by sandbox**; reviewer MUST rerun locally
+- [x] 3.2 Open the stacked PR against `feat/partner-master-phase-1-tax-identity` — PR #3
+- [x] 3.3 Apply labels: `review`, `feature`, `needs-qa` — done
 
 ## Changelog
 
 - 2026-05-03 — Initial plan drafted (auto-create-pr). Scope reduced to S1.2 + S1.6 of the source spec; rationale captured above.
+- 2026-05-03 — PR #3 opened against `feat/partner-master-phase-1-tax-identity`. Validation gate **blocked by sandbox**; reviewer MUST rerun `yarn typecheck`, `yarn test`, `yarn i18n:check-sync`, `yarn build:packages` locally before merge.
