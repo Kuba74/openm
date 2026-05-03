@@ -67,6 +67,8 @@ const listSchema = z
     id: z.string().uuid().optional(),
     customerId: z.string().uuid().optional(),
     channelId: z.string().uuid().optional(),
+    status: z.string().optional(),
+    salesOwnerUserId: z.string().optional(),
     lineItemCountMin: z.coerce.number().min(0).optional(),
     lineItemCountMax: z.coerce.number().min(0).optional(),
     totalNetMin: z.coerce.number().optional(),
@@ -97,6 +99,22 @@ function buildFilters(query: ListQuery, numberColumn: string, kind: DocumentKind
   }
   if (query.channelId) {
     filters.channel_id = { $eq: query.channelId }
+  }
+  const statusValues = typeof query.status === 'string'
+    ? query.status.split(',').map((value) => value.trim()).filter((value) => value.length > 0)
+    : []
+  if (statusValues.length === 1) {
+    filters.status = { $eq: statusValues[0] }
+  } else if (statusValues.length > 1) {
+    filters.status = { $in: statusValues }
+  }
+  const salesOwnerValues = typeof query.salesOwnerUserId === 'string'
+    ? query.salesOwnerUserId.split(',').map((value) => value.trim()).filter((value) => value.length > 0)
+    : []
+  if (salesOwnerValues.length === 1) {
+    filters.sales_owner_user_id = { $eq: salesOwnerValues[0] }
+  } else if (salesOwnerValues.length > 1) {
+    filters.sales_owner_user_id = { $in: salesOwnerValues }
   }
   const lineRange: Record<string, number> = {}
   if (typeof query.lineItemCountMin === 'number') lineRange.$gte = query.lineItemCountMin

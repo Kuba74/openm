@@ -1013,6 +1013,8 @@
   "sales.documents.list.filters.date": "Data",
   "sales.documents.list.filters.itemsMax": "Maks pozycji",
   "sales.documents.list.filters.itemsMin": "Min pozycji",
+  "sales.documents.list.filters.salesOwner": "Opiekun handlowy",
+  "sales.documents.list.filters.status": "Status",
   "sales.documents.list.filters.tags": "Tagi",
   "sales.documents.list.filters.totalGrossMax": "Maks suma (brutto)",
   "sales.documents.list.filters.totalGrossMin": "Min suma (brutto)",

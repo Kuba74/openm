@@ -1013,6 +1013,8 @@
   "sales.documents.list.filters.date": "Datum",
   "sales.documents.list.filters.itemsMax": "Max. Positionen",
   "sales.documents.list.filters.itemsMin": "Min. Positionen",
+  "sales.documents.list.filters.salesOwner": "Vertriebsmitarbeiter",
+  "sales.documents.list.filters.status": "Status",
   "sales.documents.list.filters.tags": "Tags",
   "sales.documents.list.filters.totalGrossMax": "Max. Summe (brutto)",
   "sales.documents.list.filters.totalGrossMin": "Min. Summe (brutto)",

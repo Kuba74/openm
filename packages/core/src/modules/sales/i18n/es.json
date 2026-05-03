@@ -1013,6 +1013,8 @@
   "sales.documents.list.filters.date": "Fecha",
   "sales.documents.list.filters.itemsMax": "Máx. artículos",
   "sales.documents.list.filters.itemsMin": "Mín. artículos",
+  "sales.documents.list.filters.salesOwner": "Responsable comercial",
+  "sales.documents.list.filters.status": "Estado",
   "sales.documents.list.filters.tags": "Etiquetas",
   "sales.documents.list.filters.totalGrossMax": "Máx. total (bruto)",
   "sales.documents.list.filters.totalGrossMin": "Mín. total (bruto)",

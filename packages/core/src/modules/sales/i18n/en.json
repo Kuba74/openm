@@ -1013,6 +1013,8 @@
   "sales.documents.list.filters.date": "Date",
   "sales.documents.list.filters.itemsMax": "Max items",
   "sales.documents.list.filters.itemsMin": "Min items",
+  "sales.documents.list.filters.salesOwner": "Sales owner",
+  "sales.documents.list.filters.status": "Status",
   "sales.documents.list.filters.tags": "Tags",
   "sales.documents.list.filters.totalGrossMax": "Max total (gross)",
   "sales.documents.list.filters.totalGrossMin": "Min total (gross)",
