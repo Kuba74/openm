@@ -191,8 +191,8 @@ None (no `--skill-url` provided).
 
 ### Phase 2: Validators + checksum unit tests
 
-- [ ] 2.1 Add tax-identity zod schemas + checksum helpers
-- [ ] 2.2 Add unit tests covering checksums and zod schemas
+- [x] 2.1 Add tax-identity zod schemas + checksum helpers — ea2143117
+- [x] 2.2 Add unit tests covering checksums and zod schemas — ea2143117
 
 ### Phase 3: Migration + custom fields + dictionaries + ACL + events + encryption
 
