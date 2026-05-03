@@ -18,6 +18,8 @@ export const features = [
   { id: 'customers.interactions.manage', title: 'Manage interactions', module: 'customers' },
   { id: 'customers.roles.view', title: 'View entity roles', module: 'customers' },
   { id: 'customers.roles.manage', title: 'Manage entity roles', module: 'customers' },
+  { id: 'customers.tax_identities.view', title: 'View tax identities', module: 'customers' },
+  { id: 'customers.tax_identities.manage', title: 'Manage tax identities', module: 'customers' },
 ]
 
 export default features

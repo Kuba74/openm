@@ -127,6 +127,38 @@ const JOB_TITLE_DEFAULTS: DictionaryDefault[] = [
   { value: 'Director of Retail Partnerships', label: 'Director of Retail Partnerships', color: '#f59e0b', icon: 'lucide:shopping-bag' },
 ]
 
+const LEGAL_FORM_DEFAULTS: DictionaryDefault[] = [
+  { value: 'sp_z_oo', label: 'Spółka z o.o.', icon: 'lucide:building' },
+  { value: 's_a', label: 'Spółka Akcyjna', icon: 'lucide:building-2' },
+  { value: 'sp_jawna', label: 'Spółka jawna', icon: 'lucide:users' },
+  { value: 'sp_komandytowa', label: 'Spółka komandytowa', icon: 'lucide:users-2' },
+  { value: 'sp_partnerska', label: 'Spółka partnerska', icon: 'lucide:users' },
+  { value: 'jdg', label: 'Jednoosobowa działalność gospodarcza', icon: 'lucide:user' },
+  { value: 's_c', label: 'Spółka cywilna', icon: 'lucide:users' },
+  { value: 'fundacja', label: 'Fundacja', icon: 'lucide:landmark' },
+  { value: 'stowarzyszenie', label: 'Stowarzyszenie', icon: 'lucide:landmark' },
+  { value: 'gmbh', label: 'GmbH', icon: 'lucide:building' },
+  { value: 'ag', label: 'AG', icon: 'lucide:building-2' },
+  { value: 'ug', label: 'UG (haftungsbeschränkt)', icon: 'lucide:building' },
+  { value: 'sarl', label: 'SARL', icon: 'lucide:building' },
+  { value: 'sas', label: 'SAS', icon: 'lucide:building-2' },
+  { value: 'plc', label: 'PLC', icon: 'lucide:building-2' },
+  { value: 'ltd', label: 'Ltd', icon: 'lucide:building' },
+  { value: 'inc', label: 'Inc.', icon: 'lucide:building-2' },
+  { value: 'llc', label: 'LLC', icon: 'lucide:building' },
+  { value: 'other', label: 'Inna forma prawna', icon: 'lucide:circle-help' },
+]
+
+const ENTITY_TYPE_DEFAULTS: DictionaryDefault[] = [
+  { value: 'manufacturer', label: 'Manufacturer', icon: 'lucide:factory' },
+  { value: 'distributor', label: 'Distributor', icon: 'lucide:truck' },
+  { value: 'wholesaler', label: 'Wholesaler', icon: 'lucide:warehouse' },
+  { value: 'retailer', label: 'Retailer', icon: 'lucide:shopping-bag' },
+  { value: 'end_customer', label: 'End customer', icon: 'lucide:user-check' },
+  { value: 'service_provider', label: 'Service provider', icon: 'lucide:wrench' },
+  { value: 'logistics_partner', label: 'Logistics partner', icon: 'lucide:package' },
+]
+
 const INDUSTRY_DEFAULTS: DictionaryDefault[] = [
   { value: 'Renewable Energy', label: 'Renewable Energy' },
   { value: 'Software', label: 'Software' },
@@ -1203,6 +1235,28 @@ async function seedCustomerDictionaries(em: EntityManager, { tenantId, organizat
       tenantId,
       organizationId,
       kind: 'temperature',
+      value: entry.value,
+      label: entry.label,
+      color: entry.color,
+      icon: entry.icon,
+    })
+  }
+  for (const entry of LEGAL_FORM_DEFAULTS) {
+    await ensureDictionaryEntry(em, {
+      tenantId,
+      organizationId,
+      kind: 'legal_form',
+      value: entry.value,
+      label: entry.label,
+      color: entry.color,
+      icon: entry.icon,
+    })
+  }
+  for (const entry of ENTITY_TYPE_DEFAULTS) {
+    await ensureDictionaryEntry(em, {
+      tenantId,
+      organizationId,
+      kind: 'entity_type',
       value: entry.value,
       label: entry.label,
       color: entry.color,

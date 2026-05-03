@@ -48,6 +48,14 @@ export const entities = [
     defaultEditor: false,
     fields: CUSTOMER_ACTIVITY_CUSTOM_FIELDS,
   },
+  {
+    id: 'customers:customer_tax_identity',
+    label: 'Customer Tax Identity',
+    description: 'Tax identifier (NIP, REGON, KRS, PESEL, EU VAT) attached to a customer entity.',
+    labelField: 'value',
+    showInSidebar: false,
+    defaultEditor: false,
+  },
 ]
 
 export default entities

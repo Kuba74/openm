@@ -130,6 +130,8 @@ const DICTIONARY_KINDS = new Set([
   'temperature',
   'renewal_quarter',
   'person_company_role',
+  'legal_form',
+  'entity_type',
 ])
 
 const CUSTOM_DICTIONARY_KIND_PATTERN = /^[a-z0-9]+(?:[-_][a-z0-9]+)*$/
