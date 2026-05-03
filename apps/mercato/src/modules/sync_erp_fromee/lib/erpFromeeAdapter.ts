@@ -27,25 +27,25 @@ export type ErpFromeeAdapter = {
 }
 
 const COMPANY_COLS = `
-  id,
-  "companyNo",
-  kind,
-  "legalName",
-  "displayName",
-  "shortName",
-  "searchTerm",
-  "taxId",
-  regon,
-  krs,
-  "vatEu",
-  "countryCode",
-  "defaultLanguage",
-  "isActive",
-  "isBlocked",
-  note,
-  metadata,
-  "createdAt",
-  "updatedAt"
+  c.id,
+  c."companyNo",
+  c.kind,
+  c."legalName",
+  c."displayName",
+  c."shortName",
+  c."searchTerm",
+  c."taxId",
+  c.regon,
+  c.krs,
+  c."vatEu",
+  c."countryCode",
+  c."defaultLanguage",
+  c."isActive",
+  c."isBlocked",
+  c.note,
+  c.metadata,
+  c."createdAt",
+  c."updatedAt"
 `
 
 const ROLE_COLS = `
@@ -61,21 +61,36 @@ const ROLE_COLS = `
   "createdAt"
 `
 
+// erp-fromee CompanyContact has no email/phone columns — those live in
+// CompanyCommunication (1:N). We project the primary EMAIL/PHONE/MOBILE
+// via lateral subqueries so the mapper layer keeps a flat shape.
 const CONTACT_COLS = `
-  id,
-  "companyId",
-  "firstName",
-  "lastName",
-  "displayName",
-  "jobTitle",
-  department,
-  "contactFunction",
-  email,
-  phone,
-  "isPrimary",
-  "isActive",
-  metadata,
-  "createdAt"
+  cc.id,
+  cc."companyId",
+  cc."firstName",
+  cc."lastName",
+  cc."displayName",
+  cc."jobTitle",
+  cc.department,
+  cc."contactFunction",
+  (
+    SELECT co.value
+    FROM "CompanyCommunication" co
+    WHERE co."contactId" = cc.id AND co.type = 'EMAIL' AND co."isActive" = true
+    ORDER BY co."isPrimary" DESC, co."createdAt" ASC
+    LIMIT 1
+  ) AS email,
+  (
+    SELECT co.value
+    FROM "CompanyCommunication" co
+    WHERE co."contactId" = cc.id AND co.type IN ('PHONE','MOBILE') AND co."isActive" = true
+    ORDER BY co."isPrimary" DESC, co.type ASC, co."createdAt" ASC
+    LIMIT 1
+  ) AS phone,
+  cc."isPrimary",
+  cc."isActive",
+  cc.metadata,
+  cc."createdAt"
 `
 
 const ADDRESS_COLS = `
@@ -102,18 +117,26 @@ const BANK_COLS = `
   id,
   "companyId",
   "bankName",
+  "bankNumber",
+  "accountNumber",
   iban,
   swift,
+  currency,
+  "countryCode",
+  label,
   "isPrimary",
   "isActive",
+  note,
   "createdAt"
 `
 
+// erp-fromee schema uses (system, sourceType, sourceId); type ErpFromeeCompanySourceLink
+// names them sourceSystem/externalId. We alias here so the mapper layer keeps working.
 const SOURCE_LINK_COLS = `
   id,
   "companyId",
-  "sourceSystem",
-  "externalId",
+  system AS "sourceSystem",
+  "sourceId" AS "externalId",
   "lastSyncAt"
 `
 
@@ -215,7 +238,7 @@ export function createErpFromeeAdapter(
               values: ids,
             }),
             (client as any).query({
-              text: `SELECT ${CONTACT_COLS} FROM "CompanyContact" WHERE "companyId" IN (${idPlaceholders})`,
+              text: `SELECT ${CONTACT_COLS} FROM "CompanyContact" cc WHERE cc."companyId" IN (${idPlaceholders})`,
               values: ids,
             }),
             (client as any).query({
