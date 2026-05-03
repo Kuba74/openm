@@ -220,9 +220,9 @@ None (no `--skill-url` provided).
 
 ### Phase 5: API routes
 
-- [ ] 5.1 List + create route with openapi
-- [ ] 5.2 Update + delete sub-resource route with openapi
-- [ ] 5.3 Surface duplicate index violations as 409
+- [x] 5.1 List + create route with openapi — 74e05f2ee
+- [x] 5.2 Update + delete sub-resource route with openapi — 74e05f2ee
+- [x] 5.3 Surface duplicate index violations as 409 — c5a708401
 
 ### Phase 6: UI
 
