@@ -136,6 +136,9 @@ export class CustomerEntity {
 
   @OneToMany(() => CustomerPersonProfile, (person) => person.company)
   companyMembers = new Collection<CustomerPersonProfile>(this)
+
+  @OneToMany(() => CustomerTaxIdentity, (identity) => identity.entity)
+  taxIdentities = new Collection<CustomerTaxIdentity>(this)
 }
 
 @Entity({ tableName: 'customer_people' })
@@ -282,6 +285,15 @@ export class CustomerCompanyProfile {
 
   @Property({ name: 'annual_revenue', type: 'numeric', precision: 16, scale: 2, nullable: true })
   annualRevenue?: string | null
+
+  @Property({ name: 'legal_form', type: 'text', nullable: true })
+  legalForm?: string | null
+
+  @Property({ name: 'entity_type', type: 'text', nullable: true })
+  entityType?: string | null
+
+  @Property({ name: 'full_address_krs', type: 'text', nullable: true })
+  fullAddressKrs?: string | null
 
   @Property({ name: 'created_at', type: Date, onCreate: () => new Date() })
   createdAt: Date = new Date()
@@ -1162,4 +1174,66 @@ export class CustomerPersonCompanyRole {
 
   @Property({ name: 'created_at', type: Date, onCreate: () => new Date() })
   createdAt: Date = new Date()
+}
+
+export type CustomerTaxIdentityKind =
+  | 'nip'
+  | 'regon'
+  | 'krs'
+  | 'pesel'
+  | 'vat_eu'
+  | 'vat'
+  | 'eori'
+  | 'other'
+
+@Entity({ tableName: 'customer_tax_identities' })
+@Index({ name: 'customer_tax_identities_entity_idx', properties: ['entity'] })
+@Index({ name: 'customer_tax_identities_scope_idx', properties: ['organizationId', 'tenantId'] })
+@Index({ name: 'customer_tax_identities_kind_idx', properties: ['kind'] })
+@Index({
+  name: 'customer_tax_identities_unique_active',
+  expression:
+    'create unique index "customer_tax_identities_unique_active" on "customer_tax_identities" ("country_code", "kind", "value") where "deleted_at" is null',
+})
+export class CustomerTaxIdentity {
+  [OptionalProps]?: 'isPrimary' | 'createdAt' | 'updatedAt' | 'deletedAt'
+
+  @PrimaryKey({ type: 'uuid', defaultRaw: 'gen_random_uuid()' })
+  id!: string
+
+  @Property({ name: 'organization_id', type: 'uuid' })
+  organizationId!: string
+
+  @Property({ name: 'tenant_id', type: 'uuid' })
+  tenantId!: string
+
+  @Property({ name: 'country_code', type: 'text' })
+  countryCode!: string
+
+  @Property({ name: 'kind', type: 'text' })
+  kind!: CustomerTaxIdentityKind
+
+  @Property({ name: 'value', type: 'text' })
+  value!: string
+
+  @Property({ name: 'valid_from', type: Date, nullable: true })
+  validFrom?: Date | null
+
+  @Property({ name: 'valid_to', type: Date, nullable: true })
+  validTo?: Date | null
+
+  @Property({ name: 'is_primary', type: 'boolean', default: false })
+  isPrimary: boolean = false
+
+  @Property({ name: 'created_at', type: Date, onCreate: () => new Date() })
+  createdAt: Date = new Date()
+
+  @Property({ name: 'updated_at', type: Date, onUpdate: () => new Date() })
+  updatedAt: Date = new Date()
+
+  @Property({ name: 'deleted_at', type: Date, nullable: true })
+  deletedAt?: Date | null
+
+  @ManyToOne(() => CustomerEntity, { fieldName: 'entity_id' })
+  entity!: CustomerEntity
 }
