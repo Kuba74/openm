@@ -174,6 +174,16 @@ permission denial.
 - **Bidirectional NIP masking** — display formatter only. A reviewer may
   ask for full masking; we would address that in a follow-up to keep this
   PR focused.
+- **Validation gate cannot be run inside this sandbox** — the agent
+  environment denies `yarn`, `npm`, `node`, `jest`, and `git checkout -B`.
+  The execution plan therefore commits source-of-truth code without
+  having executed `yarn build:packages`, `yarn generate`, `yarn typecheck`,
+  `yarn test`, `yarn i18n:check-sync`, or `yarn build:app`. The PR body
+  carries `Status: in-progress` and explicitly asks the reviewer (or a
+  follow-up `auto-continue-pr` run with the full toolchain) to run the
+  full gate, generate the ORM migration via `yarn db:generate`, and
+  commit the produced migration file. The plan's Phase 3.1 and the
+  validation-gate todo are both flagged as **BLOCKED** for this run.
 
 ## External References
 
@@ -196,12 +206,12 @@ None (no `--skill-url` provided).
 
 ### Phase 3: Migration + custom fields + dictionaries + ACL + events + encryption
 
-- [ ] 3.1 Generate and commit ORM migration
-- [ ] 3.2 Add LEGAL_FORM_DEFAULTS / ENTITY_TYPE_DEFAULTS dictionaries
-- [ ] 3.3 Add custom-field defaults and update ce.ts
-- [ ] 3.4 Add ACL features and update setup.ts default role grants
-- [ ] 3.5 Declare new events in events.ts
-- [ ] 3.6 Register encryption map for customer_tax_identity
+- [ ] 3.1 Generate and commit ORM migration (BLOCKED: yarn db:generate denied; see Risks)
+- [x] 3.2 Add LEGAL_FORM_DEFAULTS / ENTITY_TYPE_DEFAULTS dictionaries — 0c22c9467
+- [x] 3.3 Add custom-field defaults and update ce.ts — 0c22c9467
+- [x] 3.4 Add ACL features and update setup.ts default role grants — 0c22c9467
+- [x] 3.5 Declare new events in events.ts — 0c22c9467
+- [x] 3.6 Register encryption map for customer_tax_identity — 0c22c9467
 
 ### Phase 4: Commands
 
