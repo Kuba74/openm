@@ -23,7 +23,8 @@ import {
   DialogTrigger,
 } from '@open-mercato/ui/primitives/dialog'
 import { createCrud } from '@open-mercato/ui/backend/utils/crud'
-import { apiCall } from '@open-mercato/ui/backend/utils/apiCall'
+import { apiCall, readApiResultOrThrow } from '@open-mercato/ui/backend/utils/apiCall'
+import { AssignableStaffSelect } from '@open-mercato/core/modules/customers/components/AssignableStaffSelect'
 import { collectCustomFieldValues } from '@open-mercato/ui/backend/utils/customFieldValues'
 import { createCrudFormError } from '@open-mercato/ui/backend/utils/serverErrors'
 import { flash } from '@open-mercato/ui/backend/FlashMessages'
@@ -61,6 +62,58 @@ type DocumentKind = 'quote' | 'order'
 
 type AddressDraft = AddressEditorDraft
 
+type CustomerSalesDefaults = {
+  primaryContactId: string | null
+  primaryContactName: string | null
+  primaryEmail: string | null
+  primaryPhone: string | null
+  defaultShippingAddressId: string | null
+  defaultBillingAddressId: string | null
+  preferredCurrency: string | null
+  paymentTerms: string | null
+  salesOwnerUserId: string | null
+  defaultOfferValidityDays: number
+}
+
+function isFieldEmpty(value: unknown): boolean {
+  if (value == null) return true
+  if (typeof value === 'string') return value.trim().length === 0
+  return false
+}
+
+function applyCustomerSalesDefaults(
+  defaults: CustomerSalesDefaults,
+  currentValues: Partial<SalesDocumentFormValues>,
+  setValue: (field: string, value: unknown) => void,
+  options?: { force?: boolean },
+) {
+  const force = options?.force === true
+  if ((force || isFieldEmpty(currentValues.currencyCode)) && defaults.preferredCurrency) {
+    setValue('currencyCode', defaults.preferredCurrency)
+  }
+  if ((force || isFieldEmpty(currentValues.customerEmail)) && defaults.primaryEmail) {
+    setValue('customerEmail', defaults.primaryEmail)
+  }
+  if ((force || isFieldEmpty(currentValues.shippingAddressId)) && defaults.defaultShippingAddressId) {
+    setValue('shippingAddressId', defaults.defaultShippingAddressId)
+  }
+  if ((force || isFieldEmpty(currentValues.billingAddressId)) && defaults.defaultBillingAddressId) {
+    setValue('billingAddressId', defaults.defaultBillingAddressId)
+  }
+  if ((force || isFieldEmpty(currentValues.salesOwnerUserId)) && defaults.salesOwnerUserId) {
+    setValue('salesOwnerUserId', defaults.salesOwnerUserId)
+  }
+  if (
+    (force || isFieldEmpty(currentValues.validUntil)) &&
+    typeof defaults.defaultOfferValidityDays === 'number' &&
+    defaults.defaultOfferValidityDays > 0
+  ) {
+    const validUntil = new Date()
+    validUntil.setDate(validUntil.getDate() + defaults.defaultOfferValidityDays)
+    setValue('validUntil', validUntil.toISOString())
+  }
+}
+
 type CustomerOption = {
   id: string
   label: string
@@ -97,6 +150,8 @@ export type SalesDocumentFormValues = {
   shippingAddressDraft?: AddressDraft
   billingAddressDraft?: AddressDraft
   comments?: string | null
+  validUntil?: string | null
+  salesOwnerUserId?: string | null
 } & Record<string, unknown>
 
 type InboxPreFill = {
@@ -458,6 +513,49 @@ export function SalesDocumentForm({ onCreated, isSubmitting = false, initialKind
       return []
     }
   }, [currencyDictionary, refetchCurrencyDictionary])
+
+  const lastCustomerIdRef = React.useRef<string | null>(null)
+  const lastFetchedDefaultsRef = React.useRef<CustomerSalesDefaults | null>(null)
+  const [customerChangedAt, setCustomerChangedAt] = React.useState<number | null>(null)
+
+  const fetchAndApplySalesDefaults = React.useCallback(
+    async (
+      customerId: string,
+      currentValues: Partial<SalesDocumentFormValues>,
+      setValue: (field: string, value: unknown) => void,
+      options?: { force?: boolean },
+    ) => {
+      try {
+        const defaults = await readApiResultOrThrow<CustomerSalesDefaults>(
+          `/api/customers/companies/${encodeURIComponent(customerId)}/sales-defaults`,
+        )
+        if (!defaults) return
+        lastFetchedDefaultsRef.current = defaults
+        applyCustomerSalesDefaults(defaults, currentValues, setValue, options)
+      } catch (err) {
+        console.error('sales.documents.salesDefaults.fetch', err)
+        flash(
+          t('sales.documents.form.customer.loadDefaultsFailed', 'Failed to load customer defaults.'),
+          'error',
+        )
+      }
+    },
+    [t],
+  )
+
+  const refreshCustomerDefaults = React.useCallback(
+    async (customerId: string, setValue: (field: string, value: unknown) => void) => {
+      const cached = lastFetchedDefaultsRef.current
+      if (cached) {
+        applyCustomerSalesDefaults(cached, {}, setValue, { force: true })
+        setCustomerChangedAt(null)
+        return
+      }
+      await fetchAndApplySalesDefaults(customerId, {}, setValue, { force: true })
+      setCustomerChangedAt(null)
+    },
+    [fetchAndApplySalesDefaults],
+  )
 
   const loadCustomers = React.useCallback(async (query?: string) => {
     setCustomerLoading(true)
@@ -1091,6 +1189,44 @@ export function SalesDocumentForm({ onCreated, isSubmitting = false, initialKind
       },
     },
     {
+      id: 'validUntil',
+      label: t('sales.documents.form.validUntil', 'Valid until'),
+      type: 'custom',
+      component: ({ value, setValue }) => {
+        const dateValue = typeof value === 'string' && value.length >= 10 ? value.slice(0, 10) : ''
+        return (
+          <Input
+            type="date"
+            value={dateValue}
+            onChange={(event) => {
+              const next = event.target.value
+              if (!next) {
+                setValue(null)
+                return
+              }
+              const isoCandidate = new Date(`${next}T00:00:00.000Z`)
+              if (Number.isNaN(isoCandidate.getTime())) {
+                setValue(next)
+              } else {
+                setValue(isoCandidate.toISOString())
+              }
+            }}
+          />
+        )
+      },
+    },
+    {
+      id: 'salesOwnerUserId',
+      label: t('sales.documents.form.salesOwner', 'Sales owner'),
+      type: 'custom',
+      component: ({ value, setValue }) => (
+        <AssignableStaffSelect
+          value={typeof value === 'string' ? value : null}
+          onChange={(next) => setValue(next)}
+        />
+      ),
+    },
+    {
       id: 'comments',
       label: t('sales.documents.form.comments', 'Comments'),
       type: 'textarea',
@@ -1139,6 +1275,7 @@ export function SalesDocumentForm({ onCreated, isSubmitting = false, initialKind
               <LookupSelect
                 value={typeof values.customerEntityId === 'string' ? values.customerEntityId : null}
                 onChange={(next) => {
+                  const previousId = lastCustomerIdRef.current
                   if (next !== values.customerEntityId) {
                     resetAddressFormState(setValue)
                   }
@@ -1164,6 +1301,15 @@ export function SalesDocumentForm({ onCreated, isSubmitting = false, initialKind
                         })
                         .catch(() => {})
                     }
+                    void fetchAndApplySalesDefaults(next, values, setValue)
+                    if (previousId && previousId !== next) {
+                      setCustomerChangedAt(Date.now())
+                    }
+                    lastCustomerIdRef.current = next
+                  } else {
+                    lastCustomerIdRef.current = null
+                    setCustomerChangedAt(null)
+                    lastFetchedDefaultsRef.current = null
                   }
                 }}
                 fetchItems={async (query) => {
@@ -1221,6 +1367,33 @@ export function SalesDocumentForm({ onCreated, isSubmitting = false, initialKind
                 selectedHintLabel={(id) => t('sales.documents.form.customer.selected', 'Selected customer: {{id}}', { id })}
               />
             </div>
+            {customerChangedAt && typeof values.customerEntityId === 'string' && values.customerEntityId.length > 0 ? (
+              <div className="flex items-start justify-between gap-3 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-600 dark:bg-amber-950 dark:text-amber-100">
+                <div className="space-y-1">
+                  <p className="font-semibold">
+                    {t('sales.documents.form.customer.changed', 'Customer changed')}
+                  </p>
+                  <p>
+                    {t(
+                      'sales.documents.form.customer.changedHint',
+                      'Some fields were pre-filled from the previous customer. Refresh defaults to overwrite with the new customer values.',
+                    )}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const cid = typeof values.customerEntityId === 'string' ? values.customerEntityId : null
+                    if (!cid) return
+                    void refreshCustomerDefaults(cid, setValue)
+                  }}
+                >
+                  {t('sales.documents.form.customer.refreshDefaults', 'Refresh defaults')}
+                </Button>
+              </div>
+            ) : null}
             <div className="space-y-2">
               <Input
                 type="email"
@@ -1262,7 +1435,7 @@ export function SalesDocumentForm({ onCreated, isSubmitting = false, initialKind
         )
       },
     },
-    { id: 'channels-comments', title: '', column: 1, fields: ['channelId', 'comments'] },
+    { id: 'channels-comments', title: '', column: 1, fields: ['channelId', 'validUntil', 'salesOwnerUserId', 'comments'] },
     { id: 'currency', title: '', column: 2, fields: ['currencyCode'] },
     { id: 'shipping', title: '', column: 2, fields: ['shippingAddressSection'] },
     { id: 'billing', title: '', column: 2, fields: ['billingAddressSection'] },
@@ -1315,6 +1488,12 @@ export function SalesDocumentForm({ onCreated, isSubmitting = false, initialKind
         metadata: base.customerEmail ? { customerEmail: base.customerEmail } : undefined,
       }
       payload.channelId = base.channelId || undefined
+      if (typeof base.salesOwnerUserId === 'string' && base.salesOwnerUserId.length > 0) {
+        payload.salesOwnerUserId = base.salesOwnerUserId
+      }
+      if (typeof base.validUntil === 'string' && base.validUntil.length > 0) {
+        payload.validUntil = base.validUntil
+      }
       const documentNumber = typeof base.documentNumber === 'string' ? base.documentNumber.trim() : ''
       if (!documentNumber) {
         throw createCrudFormError(t('sales.documents.form.errors.numberRequired', 'Document number is required.'))
