@@ -226,18 +226,18 @@ None (no `--skill-url` provided).
 
 ### Phase 6: UI
 
-- [ ] 6.1 Build the injection widget (list + inline create)
-- [ ] 6.2 Map the widget into crud-form:customers.company:fields
-- [ ] 6.3 Wire NIP display formatter and inline validation
+- [x] 6.1 Build the injection widget (list + inline create) — 4ee82eb74
+- [x] 6.2 Map the widget into crud-form:customers:customer_company_profile:fields — 4ee82eb74
+- [x] 6.3 Wire NIP display formatter and inline validation — 4ee82eb74
 
 ### Phase 7: i18n
 
-- [ ] 7.1 Add locale keys to en/pl/de/es
-- [ ] 7.2 Pass yarn i18n:check-sync and i18n:check-usage
+- [x] 7.1 Add locale keys to en/pl/de/es — 0ef082e96
+- [ ] 7.2 Pass yarn i18n:check-sync and i18n:check-usage (BLOCKED: yarn denied)
 
 ### Phase 8: Integration test
 
-- [ ] 8.1 Write TC-PARTNER-001 covering create / list / 409 / delete / permissions
+- [x] 8.1 Write TC-PARTNER-001 covering create / list / 409 / delete / permissions — ab199df5c
 
 ## Changelog
 
