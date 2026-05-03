@@ -215,6 +215,11 @@ export class CustomerPersonProfile {
   expression:
     `create unique index "customer_person_company_links_active_unique" on "customer_person_company_links" ("person_entity_id", "company_entity_id") where "deleted_at" is null`,
 })
+@Index({
+  name: 'customer_person_company_links_primary_per_company_idx',
+  expression:
+    `create unique index "customer_person_company_links_primary_per_company_idx" on "customer_person_company_links" ("company_entity_id") where "is_primary" = true and "deleted_at" is null`,
+})
 export class CustomerPersonCompanyLink {
   [OptionalProps]?: 'isPrimary' | 'createdAt' | 'updatedAt' | 'deletedAt'
 
