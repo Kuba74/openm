@@ -1,0 +1,6 @@
+{
+  "formeeBridge.module.title": "Most Formee → firmy",
+  "formeeBridge.import.success": "Zaimportowano {created} z {total} firm z Formee.",
+  "formeeBridge.import.failure": "Import z Formee nie powiódł się: {message}.",
+  "formeeBridge.errors.unauthorized": "Brak autoryzacji."
+}

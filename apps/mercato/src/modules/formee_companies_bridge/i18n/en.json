@@ -1,0 +1,6 @@
+{
+  "formeeBridge.module.title": "Formee Companies Bridge",
+  "formeeBridge.import.success": "Imported {created} of {total} companies from Formee.",
+  "formeeBridge.import.failure": "Formee import failed: {message}.",
+  "formeeBridge.errors.unauthorized": "Unauthorized."
+}
